@@ -197,6 +197,26 @@ describe("preview control", function()
     vim.cmd("bwipeout!")
   end)
 
+  it("shows a loop with its own icon in the statusline and the sign", function()
+    local project = project_mod.load(root)
+    local icons = require("gaanim.icons").get()
+    inspect.cache[project.root] = { data = timeline(), stale = false }
+    vim.cmd.edit(vim.fn.fnameescape(main))
+    local buf = vim.api.nvim_get_current_buf()
+    local playhead = { time = 1.3, segment = "Problem", stop = "question", playing = true, loop = { 0.8, 1.8 } }
+    preview.status[root] = { state = "ready", key = "preview:" .. root, listen = true, queue = {}, playhead = playhead }
+    local status = require("gaanim").status()
+    assert(status:find(icons.loop .. " 0:01.3 Problem·question", 1, true), status)
+    assert(not status:find(icons.playing, 1, true), "looping replaces the play icon")
+    preview.on_playhead(project, playhead)
+    local marks = vim.api.nvim_buf_get_extmarks(buf, preview.ns, 0, -1, { details = true })
+    eq(icons.loop, vim.trim(marks[1][4].sign_text))
+    eq("Problem", preview.looped_segment(project))
+    preview.status[root] = nil
+    inspect.cache[project.root] = nil
+    vim.cmd("bwipeout!")
+  end)
+
   it("marks the line the preview rests at", function()
     local project = project_mod.load(root)
     inspect.cache[project.root] = { data = timeline(), stale = false }

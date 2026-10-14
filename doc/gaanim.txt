@@ -284,7 +284,9 @@ projects that name slides their own way. For one module per slide with
   - the slide and stop under the cursor
   - the instant the cursor's line stands for, once |:Gaanim-timeline| (or a
     still at the cursor) has run `gaanim inspect`
-  - where the preview rests (`0:01.8 Problem·question`, playing or paused),
+  - where the preview rests (`0:01.8 Problem·question`), after the play,
+    pause or, while it loops, loop icon (which also marks the signs in the
+    code and turns the slide's Loop lens into Unloop),
     or its state while it starts, reloads or failed, and the follow icon
     while it follows the cursor
   - the last check (`✓`, `!n`, `✗`)

@@ -15,7 +15,8 @@ local M = {}
 ---@field playing string
 ---@field paused string
 ---@field follow string The preview follows the cursor
----@field loop string The preview loops a range
+---@field loop string The preview loops a range, and the lens that starts it
+---@field unloop string The lens that ends a loop
 ---@field time string The instant of the cursor's line
 ---@field slides string A slides project
 ---@field video string A video project
@@ -36,6 +37,7 @@ M.sets = {
     paused = "󰏤", -- md-pause
     follow = "󰌹", -- md-link_variant
     loop = "󰑖", -- md-repeat
+    unloop = "󰑗", -- md-repeat_off
     time = "󰔛", -- md-timer_outline
     slides = "󰐨", -- md-presentation
     video = "󰎁", -- md-movie
@@ -54,6 +56,7 @@ M.sets = {
     paused = "⏸",
     follow = "⇄",
     loop = "⟲",
+    unloop = "⊘",
     time = "⏱",
     slides = "▤",
     video = "▶",

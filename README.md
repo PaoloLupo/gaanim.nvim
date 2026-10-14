@@ -48,7 +48,9 @@ exports, presents, and keeps the narration script beside the code.
   the segment) without restarting it, and `:Gaanim follow` keeps it there as
   you move. `:Gaanim loop` plays the slide under the cursor over and over
   (through its stops, across reloads), which pairs well with live mode;
-  `:Gaanim loop off` ends it. `:Gaanim seek {seconds|segment|stop}`,
+  `:Gaanim loop off` ends it. While it loops, the statusline and the signs
+  in the code show `󰑖` instead of play, and the slide's lens turns into
+  `󰑗 Unloop`. `:Gaanim seek {seconds|segment|stop}`,
   `:Gaanim play` and `:Gaanim pause` drive it too. Where the preview rests is marked in the code
   with a sign, and the statusline shows it (`󰏤 0:01.8 Problem·question`).
 - **Errors where they happen.** A failed reload puts the Python error on its

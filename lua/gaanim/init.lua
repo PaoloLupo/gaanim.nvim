@@ -53,17 +53,14 @@ function M.status()
   if preview then
     local playhead = preview.playhead
     if playhead and preview.state == "ready" then
-      local text = (playhead.playing and icons.playing or icons.paused)
-        .. " "
-        .. require("gaanim.outline").clock(playhead.time)
+      -- Looping has its own icon, in place of play or pause.
+      local icon = playhead.loop and icons.loop or (playhead.playing and icons.playing or icons.paused)
+      local text = icon .. " " .. require("gaanim.outline").clock(playhead.time)
       if playhead.segment then
         text = text .. " " .. playhead.segment
       end
       if playhead.stop and playhead.stop ~= "" then
         text = text .. "·" .. playhead.stop
-      end
-      if playhead.loop then
-        text = text .. " " .. icons.loop
       end
       table.insert(parts, text)
     else

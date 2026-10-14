@@ -151,12 +151,17 @@ function M.code_lenses(params, reply)
       { range = { start = { line = row, character = 0 }, ["end"] = { line = row, character = 0 } }, command = cmd }
     )
   end
+  local looped = package.loaded["gaanim.preview"] and require("gaanim.preview").looped_segment(project)
   for _, symbol in ipairs(index.buffer_symbols(buf)) do
     local row = symbol.lnum - 1
     local at = { uri, symbol.lnum }
     if (symbol.kind == "segment" or symbol.kind == "section") and symbol.name then
       lens(row, command(icons.playing .. " Preview", "gaanim.preview", at))
-      lens(row, command(icons.loop .. " Loop", "gaanim.loop", { uri, symbol.name }))
+      if looped == symbol.name then
+        lens(row, command(icons.unloop .. " Unloop", "gaanim.loop", { uri, "off" }))
+      else
+        lens(row, command(icons.loop .. " Loop", "gaanim.loop", { uri, symbol.name }))
+      end
       lens(row, command(icons.still .. " Still", "gaanim.still", at))
       local section = parsed and script.find_section(parsed, symbol.name)
       if section then

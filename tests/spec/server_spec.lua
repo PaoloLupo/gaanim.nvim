@@ -139,6 +139,29 @@ describe("language server", function()
     close()
   end)
 
+  it("offers to end the loop on the slide being looped", function()
+    local buf = open()
+    local preview = require("gaanim.preview")
+    preview.status[root] = {
+      state = "ready",
+      key = "preview:" .. root,
+      listen = true,
+      queue = {},
+      playhead = { time = 1, segment = "Problem", playing = true, loop = { 0.8, 1.8 } },
+    }
+    local icons = require("gaanim.icons").get()
+    local by_line = {}
+    for _, lens in ipairs(request(buf, "textDocument/codeLens") or {}) do
+      local line = lens.range.start.line + 1
+      by_line[line] = by_line[line] or {}
+      table.insert(by_line[line], lens.command.title)
+    end
+    assert(vim.tbl_contains(by_line[17], icons.unloop .. " Unloop"), vim.inspect(by_line[17]))
+    assert(vim.tbl_contains(by_line[10], icons.loop .. " Loop"))
+    preview.status[root] = nil
+    close()
+  end)
+
   it("describes a line's timeline on hover", function()
     local buf = open()
     local result = request(buf, "textDocument/hover", { position = { line = 22, character = 20 } })

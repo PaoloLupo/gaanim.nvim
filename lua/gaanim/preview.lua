@@ -44,6 +44,7 @@ M.animating_ns = vim.api.nvim_create_namespace("gaanim.animating")
 ---@field playhead? gaanim.Playhead
 ---@field queue table[] Commands waiting for the scene to be ready
 ---@field sends_timeline? boolean Its `ready` events carry the timeline
+---@field loop_signature? string The loop range last seen, to spot changes
 
 ---@type table<string, gaanim.PreviewStatus>
 M.status = {}
@@ -164,7 +165,7 @@ function M.mark_animating(project, playhead)
         local row = math.min(play.line, vim.api.nvim_buf_line_count(buf)) - 1
         vim.api.nvim_buf_set_extmark(buf, M.animating_ns, row, 0, {
           line_hl_group = "GaanimPlaying",
-          sign_text = require("gaanim.icons").get().playing,
+          sign_text = require("gaanim.icons").get()[playhead.loop and "loop" or "playing"],
           sign_hl_group = "GaanimPlayhead",
           priority = 15,
         })
@@ -191,9 +192,17 @@ function M.on_playhead(project, playhead)
     if buf and buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) then
       local line = math.min(where.line, vim.api.nvim_buf_line_count(buf)) - 1
       vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, {
-        sign_text = require("gaanim.icons").get()[playhead.playing and "playing" or "paused"],
+        sign_text = require("gaanim.icons").get()[playhead.loop and "loop" or (playhead.playing and "playing" or "paused")],
         sign_hl_group = "GaanimPlayhead",
-        virt_text = { { "  ◀ preview " .. require("gaanim.script").clock(playhead.time), "GaanimPlayheadText" } },
+        virt_text = {
+          {
+            ("  ◀ %s %s"):format(
+              playhead.loop and "loop" or "preview",
+              require("gaanim.script").clock(playhead.time)
+            ),
+            "GaanimPlayheadText",
+          },
+        },
         priority = 20,
       })
       marked[buf] = true
@@ -348,6 +357,15 @@ function M.launch(opts)
           playing = object.playing == true,
           loop = type(object.loop) == "table" and object.loop or nil,
         }
+        -- Entering, leaving or moving a loop changes the slides' lenses.
+        local loop = status.playhead.loop
+        local signature = loop and (loop[1] .. ":" .. loop[2]) or nil
+        if signature ~= status.loop_signature then
+          status.loop_signature = signature
+          if package.loaded["gaanim.server"] then
+            require("gaanim.server").refresh(project.root)
+          end
+        end
         M.on_playhead(project, status.playhead)
         changed(project)
       elseif event == "error" then
@@ -484,6 +502,20 @@ function M.loop(target)
     M.launch({ queue = { command } })
   else
     cli.notify("Looping from Neovim needs a Gaanim with --listen", vim.log.levels.WARN)
+  end
+end
+
+--- The segment whose whole range the preview loops, if any.
+---@param project gaanim.Project
+---@return string?
+function M.looped_segment(project)
+  local status = M.status[project.root]
+  local loop = status and status.playhead and status.playhead.loop
+  local data = loop and require("gaanim.inspect").cached(project)
+  for _, segment in ipairs(data and data.segments or {}) do
+    if math.abs(segment.start - loop[1]) < 1e-3 and math.abs(segment["end"] - loop[2]) < 1e-3 then
+      return segment.name
+    end
   end
 end
 
