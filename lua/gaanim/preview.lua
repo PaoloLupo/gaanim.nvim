@@ -32,6 +32,7 @@ M.animating_ns = vim.api.nvim_create_namespace("gaanim.animating")
 ---@field segment? string
 ---@field stop? string `""` at an unnamed stop, nil before the first stop
 ---@field playing boolean
+---@field loop? number[] `{ start, end }` while the preview loops a range
 
 ---@class gaanim.PreviewStatus
 ---@field state "starting"|"reloading"|"ready"|"failed"
@@ -345,11 +346,16 @@ function M.launch(opts)
           segment = object.segment,
           stop = object.stop,
           playing = object.playing == true,
+          loop = type(object.loop) == "table" and object.loop or nil,
         }
         M.on_playhead(project, status.playhead)
         changed(project)
       elseif event == "error" then
-        cli.notify(object.message or "The preview could not do that", vim.log.levels.WARN)
+        local message = object.message or "The preview could not do that"
+        if message:find("unknown variant `loop`", 1, true) or message:find("unknown variant `unloop`", 1, true) then
+          message = "Looping from Neovim needs a newer Gaanim (`gaanim update`); press L in the preview meanwhile"
+        end
+        cli.notify(message, vim.log.levels.WARN)
       end
     end,
     on_line = function(line)
@@ -426,6 +432,72 @@ function M.here(present)
   local slide = M.slide_at_cursor()
   if slide then
     M.launch({ present = present, from = slide })
+  end
+end
+
+--- The name of the segment around the cursor: from the Python, else from
+--- the timeline's instant of the cursor's line.
+---@param project gaanim.Project
+---@return string?
+function M.segment_at_cursor(project)
+  local here = index.at_cursor(0)
+  if here.segment and here.segment.name then
+    return here.segment.name
+  end
+  local inspect = require("gaanim.inspect")
+  local data = inspect.cached(project)
+  local point = data and inspect.point_at(data, vim.api.nvim_buf_get_name(0), vim.api.nvim_win_get_cursor(0)[1])
+  local segment = point and inspect.segment_at(data, point.time)
+  return segment and segment.name
+end
+
+--- Loops a segment (by name, or the one around the cursor), a time range
+--- (`"1.2 3.4"`), or stops looping (`"off"`). The preview plays the range
+--- over and over, through its stops, and keeps it across reloads.
+---@param target? string
+function M.loop(target)
+  local project = project_mod.require()
+  if not project then
+    return
+  end
+  local command
+  if target == "off" then
+    command = { cmd = "unloop" }
+  elseif target and target:match("^%s*[%d%.]+%s+[%d%.]+%s*$") then
+    local first, last = target:match("([%d%.]+)%s+([%d%.]+)")
+    command = { cmd = "loop", start = tonumber(first), ["end"] = tonumber(last) }
+  else
+    local name = (target and target ~= "" and target ~= "here") and target or M.segment_at_cursor(project)
+    if not name then
+      cli.notify("No segment around the cursor to loop", vim.log.levels.WARN)
+      return
+    end
+    command = { cmd = "loop", segment = name }
+  end
+  if M.send(project, command) then
+    return
+  end
+  if command.cmd == "unloop" then
+    return
+  end
+  if caps.get().listen and config.get().preview.listen then
+    M.launch({ queue = { command } })
+  else
+    cli.notify("Looping from Neovim needs a Gaanim with --listen", vim.log.levels.WARN)
+  end
+end
+
+--- Loops the cursor's segment, or stops looping when the preview loops.
+function M.toggle_loop()
+  local project = project_mod.require()
+  if not project then
+    return
+  end
+  local status = M.status[project.root]
+  if status and status.playhead and status.playhead.loop then
+    M.loop("off")
+  else
+    M.loop()
   end
 end
 

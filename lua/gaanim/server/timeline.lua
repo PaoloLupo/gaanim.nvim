@@ -156,6 +156,7 @@ function M.code_lenses(params, reply)
     local at = { uri, symbol.lnum }
     if (symbol.kind == "segment" or symbol.kind == "section") and symbol.name then
       lens(row, command(icons.playing .. " Preview", "gaanim.preview", at))
+      lens(row, command(icons.loop .. " Loop", "gaanim.loop", { uri, symbol.name }))
       lens(row, command(icons.still .. " Still", "gaanim.still", at))
       local section = parsed and script.find_section(parsed, symbol.name)
       if section then

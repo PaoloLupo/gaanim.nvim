@@ -79,6 +79,15 @@ reads the CLI's text output.
                         Rest the preview at a time, at a segment or Section
                         key (its first stop), or at a named stop.
 
+:Gaanim loop [{segment}|{start} {end}|off]                  *:Gaanim-loop*
+                        Loop a slide in the preview, by default the one
+                        around the cursor, or a time range: it plays over
+                        and over, through its stops, and keeps looping
+                        across reloads, so with |gaanim-live| each change
+                        shows in the loop. `off` ends it. Needs a Gaanim
+                        whose `--listen` takes `loop` (|gaanim-caps|); in the
+                        preview window, `L` does the same.
+
 :Gaanim play                                                  *:Gaanim-play*
 :Gaanim pause                                                *:Gaanim-pause*
                         Play the preview from where it rests, or pause it.
@@ -165,7 +174,8 @@ No keys are mapped. Map these in normal mode:
   <Plug>(gaanim-docs)           <Plug>(gaanim-api)
   <Plug>(gaanim-follow)         <Plug>(gaanim-timeline)
   <Plug>(gaanim-play)           <Plug>(gaanim-pause)
-  <Plug>(gaanim-live)           <Plug>(gaanim-nudge-up)
+  <Plug>(gaanim-live)           <Plug>(gaanim-loop)
+  <Plug>(gaanim-nudge-up)
   <Plug>(gaanim-nudge-down)
   <Plug>(gaanim-log)
 
@@ -281,7 +291,7 @@ projects that name slides their own way. For one module per slide with
 Show it only once the plugin has loaded, so the statusline does not load
 it: `cond = function() return vim.g.loaded_gaanim == true end`.
 
-                  *GaanimCheck* *GaanimPreview* *GaanimPlayhead* *GaanimInspect*
+                *GaanimCheck* *GaanimPreview* *GaanimPlayhead* *GaanimInspect*
 |User| events: `GaanimCheck` after each check, with `data.report`;
 `GaanimPreview` when the preview's state changes, with `data.root`;
 `GaanimPlayhead` when it moves, with `data.playhead` ({time}, {segment},
@@ -345,10 +355,11 @@ projects, next to basedpyright or pyright. It offers:
                   `ready` or `gaanim inspect` (|gaanim-caps|), refreshed
                   after each save; hidden while
                   the buffer has unsaved changes
-  code lenses     over each slide: Preview, Still, its script's spoken time
-                  against `target=` (or Write script), its time; over each
-                  voiceover: whether its take is recorded. Run one with `grx`
-                  (Neovim 0.12) or |vim.lsp.codelens.run()|
+  code lenses     over each slide: Preview, Loop, Still, its script's
+                  spoken time against `target=` (or Write script), its
+                  time; over each voiceover: whether its take is recorded.
+                  Run one with `grx` (Neovim 0.12) or
+                  |vim.lsp.codelens.run()|
   hover           what the line makes on the timeline; on an asset name, the
                   file's size and, through ffprobe, its pixels or length
   code actions    write a slide's or voiceover's missing script, name an
@@ -381,7 +392,8 @@ While the preview plays, the lines whose `play` is animating are highlighted
 (`GaanimPlaying`, linked to `LspReferenceText`); `preview.animating` turns
 it off.
 
-                                *<Plug>(gaanim-nudge-up)* *<Plug>(gaanim-nudge-down)*
+                                                     *<Plug>(gaanim-nudge-up)*
+                                                   *<Plug>(gaanim-nudge-down)*
 Like CTRL-A and CTRL-X, for decimals too: the number at or after the cursor
 moves by its own precision times the count (`0.8` → `0.9`, `0.25` → `0.26`,
 `3` → `4`). Outside Gaanim projects they are CTRL-A and CTRL-X.

@@ -62,6 +62,9 @@ function M.status()
       if playhead.stop and playhead.stop ~= "" then
         text = text .. "·" .. playhead.stop
       end
+      if playhead.loop then
+        text = text .. " " .. icons.loop
+      end
       table.insert(parts, text)
     else
       local state =

@@ -21,7 +21,7 @@ exports, presents, and keeps the narration script beside the code.
   of every project next to basedpyright and shows what only Gaanim knows:
   - the time of each `play`, `stop`, segment, marker and voiceover as an
     inlay hint at the end of its line (`󰐊 0:00.8–0:01.3`, `󰏤 0:01.3`);
-  - code lenses over each slide (`󰐊 Preview  󰋩 Still  󰍬 ≈0:42 / 1:00
+  - code lenses over each slide (`󰐊 Preview  󰑖 Loop  󰋩 Still  󰍬 ≈0:42 / 1:00
     󰔛 0:12.0–0:30.0`) and voiceover (`take recorded`);
   - hover on a line: what it makes on the timeline; on an asset name: the
     file's size, pixels or length;
@@ -46,8 +46,10 @@ exports, presents, and keeps the narration script beside the code.
   which reloads on every save. `:Gaanim preview here` moves it to the instant
   the line under the cursor stands for (the `play` that ends there, the stop,
   the segment) without restarting it, and `:Gaanim follow` keeps it there as
-  you move. `:Gaanim seek {seconds|segment|stop}`, `:Gaanim play` and
-  `:Gaanim pause` drive it too. Where the preview rests is marked in the code
+  you move. `:Gaanim loop` plays the slide under the cursor over and over
+  (through its stops, across reloads), which pairs well with live mode;
+  `:Gaanim loop off` ends it. `:Gaanim seek {seconds|segment|stop}`,
+  `:Gaanim play` and `:Gaanim pause` drive it too. Where the preview rests is marked in the code
   with a sign, and the statusline shows it (`󰏤 0:01.8 Problem·question`).
 - **Errors where they happen.** A failed reload puts the Python error on its
   line as a diagnostic, without running anything else.
@@ -134,6 +136,7 @@ file:
     { "<leader>mh", "<Plug>(gaanim-preview-here)", desc = "Preview at cursor" },
     { "<leader>mf", "<Plug>(gaanim-follow)", desc = "Preview follows cursor" },
     { "<leader>mL", "<Plug>(gaanim-live)", desc = "Live mode" },
+    { "<leader>mr", "<Plug>(gaanim-loop)", desc = "Loop slide (toggle)" },
     { "<leader>mP", "<Plug>(gaanim-present-here)", desc = "Present from cursor" },
     { "<leader>mq", "<Plug>(gaanim-stop)", desc = "Close preview" },
     { "<leader>mc", "<Plug>(gaanim-check)", desc = "Check" },

@@ -59,6 +59,9 @@ M.commands = {
   ["gaanim.seek"] = function(args)
     require("gaanim.preview").seek(args[2])
   end,
+  ["gaanim.loop"] = function(args)
+    require("gaanim.preview").loop(args[2])
+  end,
   ["gaanim.exportSlide"] = function(args)
     focus(args[1], args[2])
     require("gaanim.export").export("draft", { "here" })

@@ -166,6 +166,37 @@ describe("preview control", function()
     eq(false, preview.send(project, { cmd = "play" }))
   end)
 
+  it("loops a slide, a range, or stops looping", function()
+    local project = project_mod.load(root)
+    local written = {}
+    local key = "preview:" .. root
+    cli.jobs[key] = {
+      is_closing = function()
+        return false
+      end,
+      write = function(_, data)
+        table.insert(written, vim.json.decode(vim.trim(data)))
+      end,
+    }
+    preview.status[root] = { state = "ready", key = key, listen = true, queue = {} }
+    vim.cmd.edit(vim.fn.fnameescape(main))
+    vim.api.nvim_win_set_cursor(0, { 23, 0 })
+    preview.loop()
+    preview.loop("Closing")
+    preview.loop("1.5 2.5")
+    preview.status[root].playhead = { time = 2, playing = true, loop = { 1.5, 2.5 } }
+    preview.toggle_loop()
+    eq({
+      { cmd = "loop", segment = "Problem" },
+      { cmd = "loop", segment = "Closing" },
+      { cmd = "loop", start = 1.5, ["end"] = 2.5 },
+      { cmd = "unloop" },
+    }, written)
+    cli.jobs[key] = nil
+    preview.status[root] = nil
+    vim.cmd("bwipeout!")
+  end)
+
   it("marks the line the preview rests at", function()
     local project = project_mod.load(root)
     inspect.cache[project.root] = { data = timeline(), stale = false }

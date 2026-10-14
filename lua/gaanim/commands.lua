@@ -115,6 +115,25 @@ M.subcommands = {
       return filter(names, arglead)
     end,
   },
+  loop = {
+    desc = "Loop a slide in the preview: loop [segment|START END|off] (default: the cursor's)",
+    run = function(args)
+      require("gaanim.preview").loop(#args > 0 and table.concat(args, " ") or nil)
+    end,
+    complete = function(arglead, args)
+      if #args > 1 then
+        return {}
+      end
+      local names = { "off" }
+      local project = require("gaanim.project").current()
+      for _, symbol in ipairs(project and require("gaanim.index").project_symbols(project) or {}) do
+        if (symbol.kind == "segment" or symbol.kind == "section") and symbol.name then
+          table.insert(names, symbol.name)
+        end
+      end
+      return filter(names, arglead)
+    end,
+  },
   play = {
     desc = "Play the preview from where it rests",
     run = function()

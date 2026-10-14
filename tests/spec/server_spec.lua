@@ -129,6 +129,7 @@ describe("language server", function()
     local icons = require("gaanim.icons").get()
     eq({
       icons.playing .. " Preview",
+      icons.loop .. " Loop",
       icons.still .. " Still",
       icons.voiceover .. " ≈0:04 / 0:30",
       icons.time .. " 0:00.0–0:00.8",
