@@ -1,0 +1,111 @@
+---@mod gaanim.config Configuration
+
+local M = {}
+
+---@class gaanim.ExportPreset
+---@field ext string Output extension, without the dot
+---@field args? string[] Extra arguments for `gaanim export`
+---@field desc string Shown in the export picker
+---@field ask? "frame" Ask for a value before exporting
+
+---@class gaanim.Config
+---@field cmd string|string[] The `gaanim` executable, or a command list
+---@field projects_dir? string Where `:Gaanim new` creates projects and `:Gaanim projects` looks
+---@field new gaanim.NewConfig
+---@field preview gaanim.PreviewConfig
+---@field present gaanim.PresentConfig
+---@field check gaanim.CheckConfig
+---@field export gaanim.ExportConfig
+---@field script gaanim.ScriptConfig
+---@field outline gaanim.OutlineConfig
+---@field picker "auto"|"snacks"|"select"
+---@field lsp boolean Point pyright/basedpyright at the project's .venv
+
+---@class gaanim.NewConfig
+---@field cd "tcd"|"cd"|"lcd"|false How to enter a new or picked project
+---@field git boolean Run `git init` in a new project
+
+---@class gaanim.PreviewConfig
+---@field args string[] Extra arguments for every preview
+---@field stop_on_exit boolean Close previews when Neovim exits
+---@field editor boolean Make Gaanim's "Open in the editor" open lines in this Neovim
+
+---@class gaanim.PresentConfig
+---@field duration? string Planned length, e.g. "20m"
+---@field monitor? integer Monitor index for `--present`
+
+---@class gaanim.CheckConfig
+---@field on_save boolean Run `gaanim check` when a project file is saved
+---@field strict boolean Pass `--strict`
+---@field debounce integer Milliseconds to wait after the last save
+---@field quickfix "errors"|"always"|"never" When to open the quickfix list
+
+---@class gaanim.ExportConfig
+---@field open boolean Open the file when the export finishes
+---@field presets table<string, gaanim.ExportPreset>
+
+---@class gaanim.ScriptConfig
+---@field path? string Narration script, relative to the project root
+---@field wpm integer Words per minute used to estimate spoken time
+---@field follow boolean Scroll the script window to the slide under the cursor
+---@field timing boolean Show spoken time against each slide's target
+---@field width integer Width of the script window
+
+---@class gaanim.OutlinePattern
+---@field kind gaanim.SymbolKind
+---@field pattern string Lua pattern; its first capture is the name
+
+---@class gaanim.OutlineConfig
+---@field patterns gaanim.OutlinePattern[] Extra patterns for project conventions
+---@field ignore string[] Directory names that are never scanned
+
+---@type gaanim.Config
+M.defaults = {
+  cmd = "gaanim",
+  projects_dir = nil,
+  new = { cd = "tcd", git = false },
+  preview = { args = {}, stop_on_exit = true, editor = true },
+  present = { duration = nil, monitor = nil },
+  check = { on_save = true, strict = false, debounce = 400, quickfix = "errors" },
+  export = {
+    open = false,
+    presets = {
+      mp4 = { ext = "mp4", desc = "MP4 video, 1080p 60 fps" },
+      draft = { ext = "mp4", args = { "--quality", "draft" }, desc = "MP4 draft, 30 fps, fast" },
+      production = { ext = "mp4", args = { "--quality", "production" }, desc = "MP4, best encode" },
+      webm = { ext = "webm", desc = "WebM video (VP9)" },
+      mov = { ext = "mov", desc = "ProRes MOV for video editors" },
+      gif = { ext = "gif", desc = "Animated GIF" },
+      webp = { ext = "webp", desc = "Animated WebP" },
+      pdf = { ext = "pdf", desc = "PDF, a page per stop" },
+      notes = { ext = "pdf", args = { "--notes" }, desc = "PDF with speaker notes" },
+      bundle = { ext = "gaanim", desc = "Playback bundle (.gaanim)" },
+      still = { ext = "png", ask = "frame", desc = "One PNG at a time or marker" },
+    },
+  },
+  script = { path = nil, wpm = 150, follow = true, timing = true, width = 60 },
+  outline = {
+    patterns = {},
+    ignore = { ".venv", "venv", ".git", "__pycache__", "exports", "snapshots", "node_modules", ".ruff_cache" },
+  },
+  picker = "auto",
+  lsp = true,
+}
+
+---@type gaanim.Config?
+local current
+
+---@param opts? table
+function M.setup(opts)
+  current = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), vim.g.gaanim or {}, opts or {})
+end
+
+---@return gaanim.Config
+function M.get()
+  if not current then
+    M.setup()
+  end
+  return current --[[@as gaanim.Config]]
+end
+
+return M

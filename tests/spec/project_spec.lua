@@ -1,0 +1,33 @@
+local project = require("gaanim.project")
+
+describe("project", function()
+  local root = vim.fs.joinpath(FIXTURES, "talk")
+
+  it("reads the top-level keys of gaanim.toml", function()
+    local raw = project.read_toml(vim.fs.joinpath(root, "gaanim.toml"))
+    eq("talk", raw.name)
+    eq("slides", raw.kind)
+    eq("en-US", raw.language)
+    eq(nil, raw.relay, "keys of [polls] stay out")
+  end)
+
+  it("builds absolute paths from the manifest", function()
+    local p = project.load(root)
+    eq("slides", p.kind)
+    eq(vim.fs.joinpath(root, "main.py"), p.entry)
+    eq(vim.fs.joinpath(root, "assets"), p.assets_dir)
+    eq(vim.fs.joinpath(root, "exports"), p.output_dir)
+    eq(root, p.target)
+  end)
+
+  it("finds the project of a buffer below it", function()
+    vim.cmd.edit(vim.fn.fnameescape(vim.fs.joinpath(root, "assets", "narration", "script.md")))
+    eq(root, project.current(0).root)
+    vim.cmd("bwipeout!")
+  end)
+
+  it("lists Python files without environments or outputs", function()
+    local files = project.python_files(project.load(root))
+    eq({ vim.fs.joinpath(root, "main.py") }, files)
+  end)
+end)

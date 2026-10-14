@@ -1,0 +1,23 @@
+local commands = require("gaanim.commands")
+
+describe("commands", function()
+  it("defines :Gaanim", function()
+    eq(2, vim.fn.exists(":Gaanim"))
+  end)
+
+  it("completes subcommands", function()
+    eq({ "present", "preview", "projects" }, commands.complete("pr", "Gaanim pr"))
+  end)
+
+  it("completes the arguments of a subcommand", function()
+    eq({ "here", "only" }, commands.complete("", "Gaanim preview "))
+    eq({ "slides", "video" }, commands.complete("", "Gaanim new "))
+    eq({ "draft" }, commands.complete("dr", "Gaanim export dr"))
+  end)
+
+  it("builds a GAANIM_EDITOR command for this Neovim", function()
+    local command = require("gaanim.remote").editor_command()
+    assert(command:find("--remote-expr", 1, true))
+    assert(command:find("{file}", 1, true) and command:find("{line}", 1, true))
+  end)
+end)

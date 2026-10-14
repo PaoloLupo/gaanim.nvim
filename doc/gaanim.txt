@@ -1,0 +1,224 @@
+*gaanim.txt*  Write Gaanim videos and slides from Neovim
+
+==============================================================================
+CONTENTS                                                     *gaanim-contents*
+
+  1. Introduction .............................. |gaanim-intro|
+  2. Commands .................................. |gaanim-commands|
+  3. Mappings .................................. |gaanim-mappings|
+  4. Narration script .......................... |gaanim-script|
+  5. Configuration ............................. |gaanim-config|
+  6. Statusline and events ..................... |gaanim-statusline|
+  7. Back to the code from Gaanim .............. |gaanim-remote|
+
+==============================================================================
+1. INTRODUCTION                                                 *gaanim-intro*
+
+gaanim.nvim drives the `gaanim` command from Neovim. A project is a folder
+with a `gaanim.toml`; a Python file that imports gaanim outside any project is
+a project of its own. The plugin needs no |setup()|: |:Gaanim| and the
+|<Plug>| mappings exist once it is on 'runtimepath'.
+
+Requirements: Neovim 0.10+ (0.12 shows exports as progress messages) and
+`gaanim` on PATH. snacks.nvim is optional and gives the pickers a preview.
+Run |:checkhealth| gaanim to see what is found.
+
+==============================================================================
+2. COMMANDS                                                  *gaanim-commands*
+
+                                                                     *:Gaanim*
+:Gaanim                 Pick a subcommand.
+
+:Gaanim new [slides|video] [name]                              *:Gaanim-new*
+                        Create a project with `gaanim init` in
+                        `projects_dir` (or the current directory), with its
+                        Python environment, and open its entry script. A
+                        name with a path separator is used as a path.
+
+:Gaanim projects                                          *:Gaanim-projects*
+                        Pick one of the projects in `projects_dir` and open
+                        it.
+
+:Gaanim preview [here|only]                                *:Gaanim-preview*
+                        Open the live preview. It reloads when a project
+                        file is saved. `here` starts at the segment (or
+                        Section key) under the cursor, `only` plays just that
+                        one. Running it again with other arguments restarts
+                        the preview. A failed reload puts the Python error on
+                        its line as a diagnostic.
+
+:Gaanim present [here] [{duration}] [monitor={n}]          *:Gaanim-present*
+                        Present fullscreen with Presenter View. {duration}
+                        is the planned length, such as `20m` or `1h30m`.
+
+:Gaanim stop                                                  *:Gaanim-stop*
+                        Close the preview or presentation of the project.
+
+:Gaanim check                                                *:Gaanim-check*
+                        Run `gaanim check`. Problems go to the quickfix list
+                        and to diagnostics, placed on the script mark,
+                        segment or stop they name. Saving a project file
+                        runs it in the background (|gaanim-config| `check`).
+
+:Gaanim export [{preset}|{output}] [{options}]              *:Gaanim-export*
+                                                               *gaanim-export*
+                        Export with a preset, or to {output} whose extension
+                        picks the format. {options} go to `gaanim export`:
+                        `--from`, `--to`, `--fps`, `--width`, `--height`,
+                        `--quality`, `--transparent`, `--fit`, `--notes`.
+                        Presets write to the project's `output_dir`:
+                          mp4         MP4, 1080p 60 fps
+                          draft       MP4 at 30 fps, fast
+                          production  MP4, best encode
+                          webm mov gif webp
+                          pdf         a page per stop
+                          notes       PDF with speaker notes
+                          bundle      a .gaanim playback bundle
+                          still       one PNG at a marker or time
+                        Without arguments, pick a preset.
+
+:Gaanim still [{seconds}|{marker}]                           *:Gaanim-still*
+                        Export one PNG of that instant.
+
+:Gaanim outline [{kind}...]                                *:Gaanim-outline*
+                        Jump to a segment, section, voiceover, stop or
+                        marker of the project. {kind} limits the list.
+
+:Gaanim script [open|toggle|goto]                           *:Gaanim-script*
+                        See |gaanim-script|. Without an argument, toggle.
+
+:Gaanim docs [{text}]                                         *:Gaanim-docs*
+                        Search the documentation bundled with the project's
+                        Gaanim, which matches the installed version.
+
+:Gaanim api [{name}]                                           *:Gaanim-api*
+                        Open the API entry of {name} (default: the word
+                        under the cursor). `voiceover` finds
+                        `Scene.voiceover`.
+
+:Gaanim log                                                    *:Gaanim-log*
+                        Show the output of the gaanim commands run so far.
+
+==============================================================================
+3. MAPPINGS                                                  *gaanim-mappings*
+
+No keys are mapped. Map these in normal mode:
+
+  <Plug>(gaanim-new)            <Plug>(gaanim-projects)
+  <Plug>(gaanim-preview)        <Plug>(gaanim-preview-here)
+  <Plug>(gaanim-preview-only)   <Plug>(gaanim-present)
+  <Plug>(gaanim-present-here)   <Plug>(gaanim-stop)
+  <Plug>(gaanim-check)          <Plug>(gaanim-export)
+  <Plug>(gaanim-still)          <Plug>(gaanim-outline)
+  <Plug>(gaanim-script)         <Plug>(gaanim-script-goto)
+  <Plug>(gaanim-docs)           <Plug>(gaanim-api)
+  <Plug>(gaanim-log)
+
+Motions in the current buffer, taking a count:
+
+  <Plug>(gaanim-next-slide)     next segment, section or voiceover
+  <Plug>(gaanim-prev-slide)     previous one
+  <Plug>(gaanim-next-stop)      next `scene.stop()`
+  <Plug>(gaanim-prev-stop)      previous one
+
+==============================================================================
+4. NARRATION SCRIPT                                            *gaanim-script*
+
+Gaanim reads the talk's script from Markdown, by default
+`narration/script.md` in the asset directory (or beside the script without
+one), or the file given to `scene.narration_script()`. Each `## name` section
+is the speaker notes of the segment of that name, ignoring case, or the text
+of `scene.voiceover("name")`. A `[stop]`, `[stop name]` or `[stop: name]` line
+marks where the speaker advances. `# Title` ends a section, `###` headings are
+not read and HTML comments are ignored. Saving it updates the preview.
+
+`:Gaanim script` opens it in a window at the side. While it is open, moving
+in the code scrolls it to the section of the slide under the cursor, and to
+the mark of the stop the cursor has passed.
+
+`:Gaanim script goto` jumps from a slide's code to its section, adding the
+section with a mark per stop when it is missing, and from a section (or a
+mark) back to the segment (or stop).
+
+Each section, and each segment in the code, shows how long its text takes to
+say at `script.wpm` words per minute, against the segment's `target=`: green
+within it, amber up to 15 % over, red beyond. The `# Title` line shows the
+whole talk against `scene.slides.target()`. Voiceovers show `● take` once
+their recording exists in `narration/`.
+
+==============================================================================
+5. CONFIGURATION                                               *gaanim-config*
+
+Pass options to `require("gaanim").setup()` or set `vim.g.gaanim` before the
+plugin loads. Defaults:
+>lua
+  {
+    cmd = "gaanim",           -- or a list: { "C:/Tools/gaanim/gaanim.exe" }
+    projects_dir = nil,       -- e.g. "~/dev/gaanim"
+    new = {
+      cd = "tcd",             -- "tcd", "cd", "lcd" or false
+      git = false,            -- git init new projects
+    },
+    preview = {
+      args = {},              -- extra arguments for every preview
+      stop_on_exit = true,    -- close previews when Neovim exits
+      editor = true,          -- |gaanim-remote|
+    },
+    present = { duration = nil, monitor = nil },
+    check = {
+      on_save = true,
+      strict = false,         -- --strict: warnings fail too
+      debounce = 400,         -- ms after the last save
+      quickfix = "errors",    -- open quickfix on "errors", "always", "never"
+    },
+    export = {
+      open = false,           -- open the file when done
+      presets = { ... },      -- name = { ext, args?, desc, ask? }
+    },
+    script = {
+      path = nil,             -- script path relative to the project
+      wpm = 150,              -- speaking pace for estimates
+      follow = true,
+      timing = true,
+      width = 60,
+    },
+    outline = {
+      patterns = {},          -- { kind = "segment", pattern = "..." }
+      ignore = { ".venv", "venv", ".git", "__pycache__", "exports",
+                 "snapshots", "node_modules", ".ruff_cache" },
+    },
+    picker = "auto",          -- "snacks" or "select"
+    lsp = true,               -- point pyright/basedpyright at the
+                              -- project's .venv, where the stubs are
+  }
+<
+`outline.patterns` adds Lua patterns whose first capture is a name, for
+projects that name slides their own way. For one module per slide with
+`NAME = "Cover"`:
+>lua
+  outline = { patterns = {
+    { kind = "segment", pattern = '\nNAME%s*=%s*"([^"]+)"' },
+  } }
+<
+==============================================================================
+6. STATUSLINE AND EVENTS                                   *gaanim-statusline*
+
+`require("gaanim").status()` returns the slide and stop under the cursor, the
+preview's state (`◌ starting`, `↻ reloading`, `● ready`, `✗ failed`) and the
+last check (`✓`, `!n`, `✗`), or "" outside projects.
+
+                                                *GaanimCheck* *GaanimPreview*
+|User| events: `GaanimCheck` after each check, with `data.report`, and
+`GaanimPreview` on each line the preview prints, with `data.root`.
+
+==============================================================================
+7. BACK TO THE CODE FROM GAANIM                                *gaanim-remote*
+
+Gaanim opens script lines in the editor `GAANIM_EDITOR` names: the
+inspector, the console, a double click on the animation timeline and the
+script error panel's "Open in the editor". Previews started from Neovim get
+a `GAANIM_EDITOR` that calls this Neovim through its RPC server
+(|v:servername|), so those jumps land here. Set `preview.editor = false` to
+keep your own `GAANIM_EDITOR`.
+
+ vim:tw=78:ts=8:ft=help:norl:

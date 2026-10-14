@@ -1,0 +1,10 @@
+{
+  "name": "gaanim-snippets",
+  "description": "Snippets for Gaanim scenes and narration scripts",
+  "contributes": {
+    "snippets": [
+      { "language": "python", "path": "./python.json" },
+      { "language": "markdown", "path": "./markdown.json" }
+    ]
+  }
+}
