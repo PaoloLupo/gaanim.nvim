@@ -1,0 +1,220 @@
+---@mod gaanim.server A Gaanim language server inside Neovim
+---
+--- An LSP server written in Lua that runs in Neovim's own process
+--- (`vim.lsp.start` with a function as `cmd`). It attaches to the Python
+--- files of Gaanim projects next to basedpyright and adds what only Gaanim
+--- knows: the time of every `play`, `stop` and segment as inlay hints, code
+--- lenses over each slide, hover on timeline lines and assets, code actions,
+--- the scene's structure as document symbols, asset paths and Typst math in
+--- completion, and diagnostics for assets that do not exist.
+---
+--- Times come from `gaanim inspect` (see |gaanim.inspect|), refreshed after
+--- each save; the structure comes from the Python itself.
+
+local config = require("gaanim.config")
+
+local M = {}
+
+M.name = "gaanim"
+
+--- What the server offers. Sync is open/close/save only: handlers read the
+--- buffers directly, being in the same process.
+M.capabilities = {
+  textDocumentSync = { openClose = true, change = 0, save = true },
+  inlayHintProvider = true,
+  codeLensProvider = { resolveProvider = false },
+  hoverProvider = true,
+  codeActionProvider = { codeActionKinds = { "quickfix", "source" } },
+  documentSymbolProvider = true,
+  completionProvider = { triggerCharacters = { ".", '"', "'", "/" }, resolveProvider = false },
+}
+
+--- Request handlers by method. Each answers through `reply`, now or later.
+---@type table<string, fun(params: table, reply: fun(result: any), ctx: { root: string })>
+M.handlers = {
+  ["textDocument/inlayHint"] = function(params, reply)
+    require("gaanim.server.timeline").inlay_hints(params, reply)
+  end,
+  ["textDocument/codeLens"] = function(params, reply)
+    require("gaanim.server.timeline").code_lenses(params, reply)
+  end,
+  ["textDocument/hover"] = function(params, reply)
+    require("gaanim.server.hover").hover(params, reply)
+  end,
+  ["textDocument/codeAction"] = function(params, reply)
+    require("gaanim.server.actions").code_actions(params, reply)
+  end,
+  ["textDocument/documentSymbol"] = function(params, reply)
+    require("gaanim.server.symbols").document_symbols(params, reply)
+  end,
+  ["textDocument/completion"] = function(params, reply)
+    require("gaanim.server.completion").complete(params, reply)
+  end,
+}
+
+--- The buffer of a document URI, if it is loaded.
+---@param uri string
+---@return integer?
+function M.buffer(uri)
+  local buf = vim.uri_to_bufnr(uri)
+  if vim.api.nvim_buf_is_loaded(buf) then
+    return buf
+  end
+end
+
+--- The project and buffer of a request's document.
+---@param params table
+---@return gaanim.Project?, integer?
+function M.document(params)
+  local uri = params.textDocument and params.textDocument.uri
+  local buf = uri and M.buffer(uri)
+  if not buf then
+    return nil
+  end
+  return require("gaanim.project").current(buf), buf
+end
+
+---@type table<string, { dispatchers: vim.lsp.rpc.Dispatchers, closing: boolean }>
+local servers = {}
+
+--- A client for `vim.lsp.start`: requests go to `M.handlers` and are
+--- answered asynchronously, like a server in another process would.
+---@param dispatchers vim.lsp.rpc.Dispatchers
+---@param root string
+---@return vim.lsp.rpc.PublicClient
+function M.client(dispatchers, root)
+  local state = { dispatchers = dispatchers, closing = false }
+  servers[root] = state
+  local next_id = 0
+  local function answer(callback, notify_reply, id, err, result)
+    vim.schedule(function()
+      if notify_reply then
+        notify_reply(id)
+      end
+      callback(err, result)
+    end)
+  end
+  return {
+    request = function(method, params, callback, notify_reply)
+      next_id = next_id + 1
+      local id = next_id
+      if method == "initialize" then
+        answer(callback, notify_reply, id, nil, { capabilities = M.capabilities, serverInfo = { name = M.name } })
+      elseif method == "shutdown" then
+        answer(callback, notify_reply, id, nil, nil)
+      elseif M.handlers[method] then
+        local ok, err = pcall(M.handlers[method], params or {}, function(result)
+          answer(callback, notify_reply, id, nil, result)
+        end, { root = root })
+        if not ok then
+          answer(callback, notify_reply, id, { code = -32603, message = tostring(err) }, nil)
+        end
+      else
+        answer(callback, notify_reply, id, { code = -32601, message = "unsupported: " .. method }, nil)
+      end
+      return true, id
+    end,
+    notify = function(method, params)
+      if method == "exit" then
+        state.closing = true
+        servers[root] = nil
+        dispatchers.on_exit(0, 0)
+      elseif method == "textDocument/didOpen" or method == "textDocument/didSave" then
+        local buf = params and params.textDocument and M.buffer(params.textDocument.uri)
+        if buf then
+          vim.schedule(function()
+            require("gaanim.server.assets").publish(buf)
+          end)
+        end
+      end
+      return true
+    end,
+    is_closing = function()
+      return state.closing
+    end,
+    terminate = function()
+      state.closing = true
+      servers[root] = nil
+    end,
+  }
+end
+
+--- Asks the client to request hints and lenses again, for a project.
+---@param root string
+function M.refresh(root)
+  local state = servers[root]
+  if not state or state.closing then
+    return
+  end
+  vim.schedule(function()
+    pcall(state.dispatchers.server_request, "workspace/inlayHint/refresh", nil)
+    pcall(state.dispatchers.server_request, "workspace/codeLens/refresh", nil)
+  end)
+end
+
+--- Sends diagnostics for a document.
+---@param root string
+---@param uri string
+---@param diagnostics lsp.Diagnostic[]
+function M.publish(root, uri, diagnostics)
+  local state = servers[root]
+  if state and not state.closing then
+    state.dispatchers.notification("textDocument/publishDiagnostics", { uri = uri, diagnostics = diagnostics })
+  end
+end
+
+local inspect_timer = vim.uv.new_timer()
+
+--- Runs `gaanim inspect` again once saves settle, then refreshes hints and
+--- lenses. Without `inspect` support it only refreshes the lenses.
+---@param project gaanim.Project
+---@param delay? integer
+function M.update(project, delay)
+  inspect_timer:stop()
+  inspect_timer:start(delay or 600, 0, function()
+    vim.schedule(function()
+      local inspect = require("gaanim.inspect")
+      inspect.invalidate(project.root)
+      inspect.get(project, function()
+        M.refresh(project.root)
+      end)
+    end)
+  end)
+end
+
+--- Starts (or reuses) the server for a Python buffer of a Gaanim project.
+---@param buf integer
+---@return integer? client_id
+function M.attach(buf)
+  local cfg = config.get().server
+  if not cfg.enabled or vim.bo[buf].buftype ~= "" then
+    return nil
+  end
+  local root = vim.fs.root(buf, "gaanim.toml")
+  if not root then
+    return nil
+  end
+  root = vim.fs.normalize(root)
+  require("gaanim.server.commands").register()
+  local id = vim.lsp.start({
+    name = M.name,
+    cmd = function(dispatchers)
+      return M.client(dispatchers, root)
+    end,
+    root_dir = root,
+  }, { bufnr = buf })
+  if id and cfg.lens then
+    -- Neovim 0.12 takes a buffer or a client here, not both.
+    vim.lsp.codelens.enable(true, { bufnr = buf })
+  end
+  if id and cfg.hints then
+    vim.lsp.inlay_hint.enable(true, { bufnr = buf })
+  end
+  local project = require("gaanim.project").load(root)
+  if project and require("gaanim.cli").available() and not require("gaanim.inspect").cached(project) then
+    M.update(project, 0)
+  end
+  return id
+end
+
+return M

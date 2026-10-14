@@ -127,6 +127,16 @@ M.subcommands = {
       require("gaanim.preview").play(false)
     end,
   },
+  live = {
+    desc = "Live mode: changes reach the preview as you make them: live [on|off]",
+    run = function(args)
+      local on = args[1] == "on" or (args[1] ~= "off" and nil)
+      require("gaanim.live").toggle(on)
+    end,
+    complete = function(arglead, args)
+      return #args <= 1 and filter({ "on", "off" }, arglead) or {}
+    end,
+  },
   timeline = {
     desc = "The timeline from gaanim inspect, with times; jump and seek",
     run = function()

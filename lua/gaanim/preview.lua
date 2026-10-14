@@ -15,12 +15,14 @@ local project_mod = require("gaanim.project")
 local M = {}
 
 M.ns = vim.api.nvim_create_namespace("gaanim.playhead")
+M.animating_ns = vim.api.nvim_create_namespace("gaanim.animating")
 
 ---@class gaanim.LaunchOpts
 ---@field present? boolean
 ---@field from? string Segment or Section key to start at
 ---@field sections? string[] Only these segments or Section keys
 ---@field follow? { file: string, line: integer } Rest at the instant of this line once ready
+---@field queue? table[] Commands to send once ready
 ---@field duration? string
 ---@field monitor? integer
 ---@field args? string[]
@@ -127,6 +129,49 @@ end
 ---@type table<integer, boolean>
 local marked = {}
 
+---@type table<integer, boolean>
+local animating = {}
+
+--- While the preview plays, highlights the lines whose `play` is animating
+--- at the playhead (from `gaanim inspect`); clears them when it pauses.
+---@param project gaanim.Project
+---@param playhead gaanim.Playhead
+function M.mark_animating(project, playhead)
+  for buf in pairs(animating) do
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_clear_namespace(buf, M.animating_ns, 0, -1)
+    end
+  end
+  animating = {}
+  if not (playhead.playing and config.get().preview.animating) then
+    return
+  end
+  local inspect = require("gaanim.inspect")
+  local data = inspect.cached(project)
+  if not data then
+    if caps.get().inspect then
+      inspect.get(project, function() end)
+    end
+    return
+  end
+  local time = playhead.time
+  for _, play in ipairs(data.plays or {}) do
+    if play.file and play.line and play.start <= time + 1e-6 and time < play["end"] then
+      local buf = vim.fn.bufnr(vim.fs.normalize(play.file))
+      if buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) and not vim.bo[buf].modified then
+        local row = math.min(play.line, vim.api.nvim_buf_line_count(buf)) - 1
+        vim.api.nvim_buf_set_extmark(buf, M.animating_ns, row, 0, {
+          line_hl_group = "GaanimPlaying",
+          sign_text = require("gaanim.icons").get().playing,
+          sign_hl_group = "GaanimPlayhead",
+          priority = 15,
+        })
+        animating[buf] = true
+      end
+    end
+  end
+end
+
 --- Marks the line the preview rests at, and moves the script window to the
 --- slide being shown.
 ---@param project gaanim.Project
@@ -152,6 +197,7 @@ function M.on_playhead(project, playhead)
       marked[buf] = true
     end
   end
+  M.mark_animating(project, playhead)
   if package.loaded["gaanim.script"] and playhead.segment then
     require("gaanim.script").show_slide(project, playhead.segment, playhead.stop)
   end
@@ -225,6 +271,7 @@ function M.launch(opts)
   if follow then
     table.insert(status.queue, follow)
   end
+  vim.list_extend(status.queue, opts.queue or {})
   M.status[project.root] = status
   local pending = {} -- Lines since the last reload: a traceback, prints
   local function set(state, detail)
@@ -255,7 +302,10 @@ function M.launch(opts)
     require("gaanim.check").publish(project, report)
     pending = {}
     set("failed", report.summary)
-    cli.notify("✗ " .. report.summary, vim.log.levels.ERROR)
+    local live = package.loaded["gaanim.live"] and require("gaanim.live").active(project.root)
+    if not (live and cfg.live.quiet) then
+      cli.notify("✗ " .. report.summary, vim.log.levels.ERROR)
+    end
   end
 
   ---@type vim.SystemObj?
@@ -320,6 +370,7 @@ function M.launch(opts)
           end
         end
         marked = {}
+        M.mark_animating(project, { time = 0, playing = false })
       end
       if launched[key] == signature and not cli.running(key) then
         launched[key] = nil
@@ -389,8 +440,13 @@ function M.seek(target)
       end
     end
   end
-  if not M.send(project, command) then
-    cli.notify("No preview takes commands; open one with :Gaanim preview", vim.log.levels.WARN)
+  if M.send(project, command) then
+    return
+  end
+  if caps.get().listen and config.get().preview.listen then
+    M.launch({ queue = { command } })
+  else
+    cli.notify("Moving the preview needs a Gaanim with --listen", vim.log.levels.WARN)
   end
 end
 

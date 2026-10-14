@@ -103,7 +103,11 @@ Done since the first version: driving the preview (`here`, `follow`, `seek`,
 `play`, `pause`), the playhead in the code and the statusline, the script
 following the slide on screen, `:Gaanim timeline`, the cursor's instant,
 stills and ranges at the cursor, JSON messages, Typst math completion, Python
-completion from the `.venv`, Nerd Font icons and lazy loading.
+completion from the `.venv`, Nerd Font icons and lazy loading. Then a
+Gaanim language server inside Neovim (times as inlay hints, code lenses over
+slides, hover, code actions, symbols, asset and Typst completion, missing
+asset warnings) and live mode with decimal nudges and the animating lines
+highlighted while the preview plays.
 
 Next, in the plugin alone:
 

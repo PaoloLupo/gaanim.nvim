@@ -21,6 +21,21 @@ local M = {}
 ---@field picker "auto"|"snacks"|"select"
 ---@field icons "nerd"|"unicode"|table Nerd Font icons, plain characters, or overrides
 ---@field lsp boolean Point pyright/basedpyright at the project's .venv
+---@field server gaanim.ServerConfig
+---@field live gaanim.LiveConfig
+
+---@class gaanim.ServerConfig
+---@field enabled boolean Attach the Gaanim language server to project files
+---@field hints boolean Times of plays, stops and segments as inlay hints
+---@field lens boolean Code lenses over slides and voiceovers
+---@field assets boolean Warn about asset names that resolve to no file
+---@field typst boolean Typst math completion in equation strings
+
+---@class gaanim.LiveConfig
+---@field delay integer Milliseconds after a change before writing
+---@field while_typing boolean Also write in insert mode, after `typing_delay`
+---@field typing_delay integer
+---@field quiet boolean Only diagnostics, no notifications, when a reload fails
 
 ---@class gaanim.NewConfig
 ---@field cd "tcd"|"cd"|"lcd"|false How to enter a new or picked project
@@ -32,6 +47,7 @@ local M = {}
 ---@field editor boolean Make Gaanim's "Open in the editor" open lines in this Neovim
 ---@field listen boolean Drive the preview through `--listen stdio` when Gaanim has it
 ---@field marker boolean Mark the line the preview rests at
+---@field animating boolean Highlight the lines whose plays are animating while the preview plays
 ---@field follow_delay integer Milliseconds a following preview waits for the cursor to settle
 
 ---@class gaanim.PresentConfig
@@ -68,7 +84,15 @@ M.defaults = {
   cmd = "gaanim",
   projects_dir = nil,
   new = { cd = "tcd", git = false },
-  preview = { args = {}, stop_on_exit = true, editor = true, listen = true, marker = true, follow_delay = 120 },
+  preview = {
+    args = {},
+    stop_on_exit = true,
+    editor = true,
+    listen = true,
+    marker = true,
+    animating = true,
+    follow_delay = 120,
+  },
   present = { duration = nil, monitor = nil },
   check = { on_save = true, strict = false, debounce = 400, quickfix = "errors" },
   export = {
@@ -94,6 +118,8 @@ M.defaults = {
   },
   picker = "auto",
   icons = "nerd",
+  server = { enabled = true, hints = true, lens = true, assets = true, typst = true },
+  live = { delay = 300, while_typing = false, typing_delay = 900, quiet = true },
   lsp = true,
 }
 

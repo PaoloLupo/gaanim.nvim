@@ -7,6 +7,7 @@ exports, presents, and keeps the narration script beside the code.
 
 ```
 :Gaanim new slides talk      create ~/dev/gaanim/talk and open main.py
+:Gaanim live                 every change reaches the preview as you make it
 :Gaanim follow               the preview follows the cursor through the code
 :Gaanim script               the slide's script in a side window
 :Gaanim still                a PNG of the instant the cursor's line stands for
@@ -16,6 +17,28 @@ exports, presents, and keeps the narration script beside the code.
 
 ## What it does
 
+- **A Gaanim language server inside Neovim.** It attaches to the Python files
+  of every project next to basedpyright and shows what only Gaanim knows:
+  - the time of each `play`, `stop`, segment, marker and voiceover as an
+    inlay hint at the end of its line (`󰐊 0:00.8–0:01.3`, `󰏤 0:01.3`);
+  - code lenses over each slide (`󰐊 Preview  󰋩 Still  󰍬 ≈0:42 / 1:00
+    󰔛 0:12.0–0:30.0`) and voiceover (`take recorded`);
+  - hover on a line: what it makes on the timeline; on an asset name: the
+    file's size, pixels or length;
+  - code actions: write a slide's missing script, name an unnamed stop, add
+    a marker, preview the line, export its frame or its slide;
+  - slides, stops, markers and voiceovers as document symbols (outline,
+    breadcrumbs, symbol pickers);
+  - completion of asset names inside `media.image("…")`, `svg`, `audio`,
+    `video`… and of Typst math, in any completion plugin;
+  - a warning on asset names that resolve to no file.
+- **Live mode.** `:Gaanim live` writes a changed file a moment after you stop
+  changing it, without running write hooks such as formatters, so the preview
+  shows each change within a fraction of a second. While the preview plays,
+  the lines whose `play` is animating are highlighted.
+- **Nudging numbers.** `<Plug>(gaanim-nudge-up)` and `-down` work like CTRL-A
+  and CTRL-X but step decimals by their own precision (`0.8` → `0.9`,
+  `0.25` → `0.26`); with live mode, each nudge shows in the preview.
 - **Projects.** `:Gaanim new [slides|video] [name]` runs `gaanim init` (Python
   environment included) in `projects_dir` and opens the entry script;
   `:Gaanim projects` lists the projects there.
@@ -60,7 +83,7 @@ exports, presents, and keeps the narration script beside the code.
   project's Gaanim (it matches the installed version); `:Gaanim api [name]`
   opens an API entry, by default the word under the cursor.
 - **Typst math completion.** Inside the strings of `scene.text.equation(...)`
-  and the `$...$` of other text, a blink.cmp source offers Typst's math
+  and the `$...$` of other text, the language server offers Typst's math
   symbols with the character each one draws as its icon (`α alpha`,
   `⇒ arrow.r.double`; type `.` for a symbol's variants), its math functions
   (`frac`, `sqrt`, `mat`, `cases`, `bold`…) as snippets, accents, text
@@ -107,6 +130,7 @@ file:
     { "<leader>mp", "<Plug>(gaanim-preview)", desc = "Preview" },
     { "<leader>mh", "<Plug>(gaanim-preview-here)", desc = "Preview at cursor" },
     { "<leader>mf", "<Plug>(gaanim-follow)", desc = "Preview follows cursor" },
+    { "<leader>mL", "<Plug>(gaanim-live)", desc = "Live mode" },
     { "<leader>mP", "<Plug>(gaanim-present-here)", desc = "Present from cursor" },
     { "<leader>mq", "<Plug>(gaanim-stop)", desc = "Close preview" },
     { "<leader>mc", "<Plug>(gaanim-check)", desc = "Check" },
@@ -122,9 +146,15 @@ file:
     { "[v", "<Plug>(gaanim-prev-slide)", ft = "python", desc = "Previous slide" },
     { "]V", "<Plug>(gaanim-next-stop)", ft = "python", desc = "Next stop" },
     { "[V", "<Plug>(gaanim-prev-stop)", ft = "python", desc = "Previous stop" },
+    { "<C-a>", "<Plug>(gaanim-nudge-up)", ft = "python", desc = "Increase number" },
+    { "<C-x>", "<Plug>(gaanim-nudge-down)", ft = "python", desc = "Decrease number" },
   },
 }
 ```
+
+The nudges fall back to CTRL-A and CTRL-X outside Gaanim projects. Code
+lenses run with `grx` (Neovim 0.12) or LazyVim's `<leader>cc`; inlay hints
+toggle with `vim.lsp.inlay_hint.enable()` or LazyVim's `<leader>uh`.
 
 The plugin needs no `setup()`: the command and `<Plug>` mappings exist as
 soon as it is on the runtimepath, and options can also go in `vim.g.gaanim`.
@@ -138,21 +168,10 @@ Statusline (lualine), shown once the plugin has loaded so it never loads it:
 }
 ```
 
-Typst math completion with blink.cmp, only in Python buffers:
-
-```lua
-{
-  "saghen/blink.cmp",
-  opts = {
-    sources = {
-      per_filetype = { python = { inherit_defaults = true, "gaanim_typst" } },
-      providers = {
-        gaanim_typst = { name = "Typst", module = "gaanim.typst.blink", score_offset = 20 },
-      },
-    },
-  },
-}
-```
+Typst math and asset names come from the language server, so any completion
+plugin with an LSP source shows them (blink.cmp keeps each symbol's character
+as its icon). With `server.enabled = false`, the blink source
+`gaanim.typst.blink` still offers Typst math.
 
 Snippets with blink.cmp: add the plugin's `snippets` folder to
 `sources.providers.snippets.opts.search_paths`. With LuaSnip:
@@ -170,6 +189,7 @@ Snippets with blink.cmp: add the plugin's `snippets` folder to
     editor = true,                 -- GAANIM_EDITOR back to this Neovim
     listen = true,                 -- drive the preview with --listen stdio
     marker = true,                 -- sign on the line the preview rests at
+    animating = true,              -- highlight the lines animating while playing
     follow_delay = 120,            -- ms the cursor settles before following
   },
   present = { duration = nil, monitor = nil },
@@ -179,6 +199,8 @@ Snippets with blink.cmp: add the plugin's `snippets` folder to
   outline = { patterns = {}, ignore = { ".venv", "exports", ... } },
   picker = "auto",                 -- "snacks" or "select"
   icons = "nerd",                  -- "unicode" without a Nerd Font, or a table
+  server = { enabled = true, hints = true, lens = true, assets = true, typst = true },
+  live = { delay = 300, while_typing = false, typing_delay = 900, quiet = true },
   lsp = true,                      -- point pyright/basedpyright at .venv
 }
 ```

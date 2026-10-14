@@ -57,6 +57,13 @@ function M.open_log()
   vim.api.nvim_win_set_cursor(0, { math.max(#log, 1), 0 })
 end
 
+--- Whether the configured executable exists, without telling anyone.
+---@return boolean
+function M.available()
+  local cmd = config.get().cmd
+  return vim.fn.executable(type(cmd) == "table" and cmd[1] or cmd) == 1
+end
+
 --- The executable and its fixed arguments, resolved on PATH.
 ---@return string[]?
 function M.executable()

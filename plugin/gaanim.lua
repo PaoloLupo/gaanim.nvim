@@ -34,6 +34,13 @@ plug("gaanim-follow", cmd("follow"), "Gaanim: preview follows the cursor (toggle
 plug("gaanim-play", cmd("play"), "Gaanim: play the preview")
 plug("gaanim-pause", cmd("pause"), "Gaanim: pause the preview")
 plug("gaanim-timeline", cmd("timeline"), "Gaanim: timeline")
+plug("gaanim-live", cmd("live"), "Gaanim: live mode (toggle)")
+plug("gaanim-nudge-up", function()
+  require("gaanim.nudge").nudge(1)
+end, "Gaanim: increase the number under the cursor")
+plug("gaanim-nudge-down", function()
+  require("gaanim.nudge").nudge(-1)
+end, "Gaanim: decrease the number under the cursor")
 plug("gaanim-preview-only", cmd("preview only"), "Gaanim: preview only the slide under the cursor")
 plug("gaanim-present", cmd("present"), "Gaanim: present")
 plug("gaanim-present-here", cmd("present here"), "Gaanim: present from the line under the cursor")
@@ -65,6 +72,7 @@ local group = vim.api.nvim_create_augroup("gaanim", { clear = true })
 local function highlights()
   vim.api.nvim_set_hl(0, "GaanimPlayhead", { link = "DiagnosticInfo", default = true })
   vim.api.nvim_set_hl(0, "GaanimPlayheadText", { link = "Comment", default = true })
+  vim.api.nvim_set_hl(0, "GaanimPlaying", { link = "LspReferenceText", default = true })
 end
 highlights()
 vim.api.nvim_create_autocmd("ColorScheme", { group = group, callback = highlights })
@@ -81,6 +89,12 @@ vim.api.nvim_create_autocmd("BufWritePost", {
         require("gaanim.inspect").invalidate(vim.fs.normalize(root))
       end
       require("gaanim.check").on_save(args.buf)
+      if package.loaded["gaanim.server"] and args.file:match("%.py$") then
+        local project = require("gaanim.project").current(args.buf)
+        if project then
+          require("gaanim.server").update(project)
+        end
+      end
     end
   end,
 })
@@ -106,6 +120,65 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "BufWritePost", "InsertLeave" }, {
   callback = function(args)
     if package.loaded["gaanim.script"] then
       require("gaanim.script").refresh(args.buf)
+    end
+  end,
+})
+
+-- The Gaanim language server, for the Python files of Gaanim projects.
+local function attach(buf)
+  if vim.bo[buf].filetype == "python" and vim.fs.root(buf, "gaanim.toml") then
+    require("gaanim.server").attach(buf)
+  end
+end
+vim.api.nvim_create_autocmd("FileType", {
+  group = group,
+  pattern = "python",
+  callback = function(args)
+    attach(args.buf)
+  end,
+})
+-- Buffers opened before the plugin loaded (it loads lazily).
+for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+  if vim.api.nvim_buf_is_loaded(buf) then
+    attach(buf)
+  end
+end
+
+local asset_timer = vim.uv.new_timer()
+vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave", "TextChanged" }, {
+  group = group,
+  pattern = "*.py",
+  callback = function(args)
+    if not package.loaded["gaanim.server"] then
+      return
+    end
+    asset_timer:stop()
+    asset_timer:start(300, 0, function()
+      vim.schedule(function()
+        if vim.api.nvim_buf_is_valid(args.buf) then
+          require("gaanim.server.assets").publish(args.buf)
+        end
+      end)
+    end)
+  end,
+})
+
+-- Live mode writes changed project files once the changes settle.
+vim.api.nvim_create_autocmd({ "TextChanged", "InsertLeave" }, {
+  group = group,
+  pattern = { "*.py", "*.md", "gaanim.toml" },
+  callback = function(args)
+    if package.loaded["gaanim.live"] then
+      require("gaanim.live").on_change(args.buf, false)
+    end
+  end,
+})
+vim.api.nvim_create_autocmd("TextChangedI", {
+  group = group,
+  pattern = { "*.py", "*.md" },
+  callback = function(args)
+    if package.loaded["gaanim.live"] then
+      require("gaanim.live").on_change(args.buf, true)
     end
   end,
 })

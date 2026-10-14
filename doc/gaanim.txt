@@ -11,6 +11,8 @@ CONTENTS                                                     *gaanim-contents*
   6. Statusline and events ..................... |gaanim-statusline|
   7. Back to the code from Gaanim .............. |gaanim-remote|
   8. Typst math completion ..................... |gaanim-typst|
+  9. Language server ........................... |gaanim-server|
+ 10. Live mode and nudges ...................... |gaanim-live|
 
 ==============================================================================
 1. INTRODUCTION                                                 *gaanim-intro*
@@ -160,6 +162,8 @@ No keys are mapped. Map these in normal mode:
   <Plug>(gaanim-docs)           <Plug>(gaanim-api)
   <Plug>(gaanim-follow)         <Plug>(gaanim-timeline)
   <Plug>(gaanim-play)           <Plug>(gaanim-pause)
+  <Plug>(gaanim-live)           <Plug>(gaanim-nudge-up)
+  <Plug>(gaanim-nudge-down)
   <Plug>(gaanim-log)
 
 Motions in the current buffer, taking a count:
@@ -213,6 +217,7 @@ plugin loads. Defaults:
       editor = true,          -- |gaanim-remote|
       listen = true,          -- drive it with --listen stdio (|gaanim-caps|)
       marker = true,          -- sign on the line the preview rests at
+      animating = true,       -- highlight the lines animating while playing
       follow_delay = 120,     -- ms the cursor settles before |:Gaanim-follow|
     },
     present = { duration = nil, monitor = nil },
@@ -239,6 +244,12 @@ plugin loads. Defaults:
                  "snapshots", "node_modules", ".ruff_cache" },
     },
     picker = "auto",          -- "snacks" or "select"
+    server = {                -- |gaanim-server|
+      enabled = true, hints = true, lens = true, assets = true, typst = true,
+    },
+    live = {                  -- |gaanim-live|
+      delay = 300, while_typing = false, typing_delay = 900, quiet = true,
+    },
     icons = "nerd",           -- Nerd Font icons; "unicode" without one, or
                               -- a table overriding some: { segment = "▤" }
     lsp = true,               -- point pyright/basedpyright at the
@@ -291,7 +302,7 @@ keep your own `GAANIM_EDITOR`.
 
 Gaanim reads Typst math in every string passed to `equation(...)`
 (`scene.text.equation("x^2 + y")`, without `$`) and in the `$...$` spans of
-other text. There, the blink.cmp source `gaanim.typst.blink` offers:
+other text. There, the language server (|gaanim-server|) offers:
 
   symbols     Typst's math symbols, each with the character it draws as its
               icon. After a `.` it offers the variants of the name before it:
@@ -308,17 +319,67 @@ code after `#` get nothing. The symbol names come from codex 0.3.0, the
 version Gaanim's Typst uses; `scripts/gen_typst_symbols.py` regenerates
 `lua/gaanim/typst/symbols.lua` from another codex.
 
-Register the source in blink.cmp:
+Any completion plugin with an LSP source shows them; blink.cmp keeps each
+symbol's character as its icon. With `server.enabled = false`, the blink.cmp
+source `gaanim.typst.blink` offers the same items:
 >lua
   sources = {
-    default = { "lsp", "path", "snippets", "buffer", "gaanim_typst" },
+    per_filetype = { python = { inherit_defaults = true, "gaanim_typst" } },
     providers = {
-      gaanim_typst = { name = "Typst", module = "gaanim.typst.blink",
-                       score_offset = 20 },
+      gaanim_typst = { name = "Typst", module = "gaanim.typst.blink" },
     },
   }
 <
-Other completion plugins can call `require("gaanim.typst").items_at(buf,
-{row, col})`, which returns LSP completion items or nil outside math.
+==============================================================================
+9. LANGUAGE SERVER                                             *gaanim-server*
+
+A language server written in Lua runs inside Neovim (`vim.lsp.start` with a
+function as `cmd`) and attaches, as `gaanim`, to the Python files of Gaanim
+projects, next to basedpyright or pyright. It offers:
+
+  inlay hints     the time of each `play`, `stop`, segment, marker and
+                  voiceover at the end of its line, from `gaanim inspect`
+                  (|gaanim-caps|), refreshed after each save; hidden while
+                  the buffer has unsaved changes
+  code lenses     over each slide: Preview, Still, its script's spoken time
+                  against `target=` (or Write script), its time; over each
+                  voiceover: whether its take is recorded. Run one with `grx`
+                  (Neovim 0.12) or |vim.lsp.codelens.run()|
+  hover           what the line makes on the timeline; on an asset name, the
+                  file's size and, through ffprobe, its pixels or length
+  code actions    write a slide's or voiceover's missing script, name an
+                  unnamed stop, add a marker below, preview the line, export
+                  its frame or its slide as a draft
+  symbols         slides with their stops, markers and voiceovers
+  completion      asset names inside `image`, `svg`, `audio`, `sfx`, `sound`,
+                  `video`, `lottie`, `gltf`, `narration_script` and
+                  `preload`; Typst math (|gaanim-typst|)
+  diagnostics     asset names that resolve to no file
+
+Turn parts off with `server` in |gaanim-config|. Inlay hints follow
+|vim.lsp.inlay_hint.enable()|; the plugin enables them and code lenses for
+the buffers it attaches to.
+
+==============================================================================
+10. LIVE MODE AND NUDGES                                         *gaanim-live*
+
+                                                                *:Gaanim-live*
+:Gaanim live [on|off]   In live mode a changed project file is written
+                        `live.delay` ms after you stop changing it in normal
+                        mode (and while typing when `live.while_typing` is
+                        on), without write autocommands such as formatters.
+                        Gaanim reloads on each write, so the preview shows
+                        the change at once; failed reloads only update the
+                        diagnostics (`live.quiet`). Turning it on opens the
+                        preview at the cursor when it is closed.
+
+While the preview plays, the lines whose `play` is animating are highlighted
+(`GaanimPlaying`, linked to `LspReferenceText`); `preview.animating` turns
+it off.
+
+                                *<Plug>(gaanim-nudge-up)* *<Plug>(gaanim-nudge-down)*
+Like CTRL-A and CTRL-X, for decimals too: the number at or after the cursor
+moves by its own precision times the count (`0.8` → `0.9`, `0.25` → `0.26`,
+`3` → `4`). Outside Gaanim projects they are CTRL-A and CTRL-X.
 
  vim:tw=78:ts=8:ft=help:norl:

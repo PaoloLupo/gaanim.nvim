@@ -10,6 +10,7 @@ local M = {}
 ---@field section string
 ---@field stop string
 ---@field marker string
+---@field still string A frame exported as an image
 ---@field voiceover string
 ---@field playing string
 ---@field paused string
@@ -28,6 +29,7 @@ M.sets = {
     section = "󰚟", -- md-format_section
     stop = "󰏤", -- md-pause
     marker = "󰃀", -- md-bookmark
+    still = "󰋩", -- md-image
     voiceover = "󰍬", -- md-microphone
     playing = "󰐊", -- md-play
     paused = "󰏤", -- md-pause
@@ -44,6 +46,7 @@ M.sets = {
     section = "§",
     stop = "⏸",
     marker = "◆",
+    still = "▣",
     voiceover = "♪",
     playing = "▶",
     paused = "⏸",
