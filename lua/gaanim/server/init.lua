@@ -17,10 +17,14 @@ local M = {}
 
 M.name = "gaanim"
 
---- What the server offers. Sync is open/close/save only: handlers read the
---- buffers directly, being in the same process.
+--- What the server offers. Positions are byte offsets (UTF-8), the way the
+--- handlers read lines; with UTF-16 a hint after `¿` or an accent lands past
+--- the end of its line. Handlers read the buffers directly, being in the same
+--- process, but changes are still synced: the client re-requests hints and
+--- lenses on `didChange`, which drops times while a line is being edited.
 M.capabilities = {
-  textDocumentSync = { openClose = true, change = 0, save = true },
+  positionEncoding = "utf-8",
+  textDocumentSync = { openClose = true, change = 2, save = true },
   inlayHintProvider = true,
   codeLensProvider = { resolveProvider = false },
   hoverProvider = true,

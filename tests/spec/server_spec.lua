@@ -66,6 +66,46 @@ describe("language server", function()
     close()
   end)
 
+  it("speaks in byte offsets, so hints after accents stay on their line", function()
+    local buf = open()
+    local client = vim.lsp.get_clients({ bufnr = buf, name = "gaanim" })[1]
+    eq("utf-8", client.offset_encoding)
+    -- Line 13 holds a play; give it accents and save, as an author would.
+    local row = 13
+    local text = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] .. "  # ¿qué pasó?"
+    vim.api.nvim_buf_set_lines(buf, row - 1, row, false, { text })
+    vim.bo[buf].modified = false
+    local hints = request(buf, "textDocument/inlayHint", {
+      range = { start = { line = 0, character = 0 }, ["end"] = { line = 40, character = 0 } },
+    })
+    for _, hint in ipairs(hints or {}) do
+      if hint.position.line == row - 1 then
+        eq(#text, hint.position.character)
+      end
+    end
+    close()
+  end)
+
+  it("drops shown hints as soon as a line is edited", function()
+    local buf = open()
+    vim.lsp.inlay_hint.enable(true, { bufnr = buf })
+    local count = function()
+      return #vim.tbl_filter(function(h)
+        return vim.lsp.get_client_by_id(h.client_id).name == "gaanim"
+      end, vim.lsp.inlay_hint.get({ bufnr = buf }))
+    end
+    vim.wait(2000, function()
+      return count() > 0
+    end, 20)
+    assert(count() > 0, "hints are shown")
+    vim.api.nvim_buf_set_text(buf, 12, 0, 12, 20, { "" })
+    vim.wait(2000, function()
+      return count() == 0
+    end, 20)
+    eq(0, count(), "an edit re-requests hints, which wait for the save")
+    close()
+  end)
+
   it("hides hints while the buffer has unsaved changes", function()
     local buf = open()
     vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "# changed" })
