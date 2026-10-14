@@ -133,6 +133,9 @@ Next, in the plugin alone:
 8. **Releases:** `vX.Y.Z` tags (lazy.nvim and `vim.pack` pin them) and luarocks
    through luarocks-tag-release if it is distributed further.
 
+Gaanim since gave the preview's `ready` event the scene's timeline (#539), so
+an open preview feeds the times in the code without a second run.
+
 Still to ask of Gaanim:
 
 - **Captions and chapters from the CLI** (#430, #427) and word times from
@@ -152,8 +155,9 @@ Still to ask of Gaanim:
 - On Windows, Neovim's child processes end with it (libuv puts them in a job
   object with `KILL_ON_JOB_CLOSE`), so `preview.stop_on_exit` is the natural
   setting.
-- `:Gaanim timeline` and the cursor's instant run the scene through
-  `inspect` (about a second for a short talk); they refresh after a save.
+- Without an open preview, `:Gaanim timeline` and the times in the code run
+  the scene through `inspect` (about a second for a short talk). With one
+  open, each reload's `ready` brings the timeline and nothing runs twice.
 
 ## Sources
 

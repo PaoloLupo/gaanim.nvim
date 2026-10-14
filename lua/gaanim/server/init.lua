@@ -165,17 +165,16 @@ end
 
 local inspect_timer = vim.uv.new_timer()
 
---- Runs `gaanim inspect` again once saves settle, then refreshes hints and
---- lenses. Without `inspect` support it only refreshes the lenses.
+--- Once saves settle, gets the new timeline (from the preview's next
+--- `ready`, else `gaanim inspect`) and refreshes hints and lenses. The save
+--- itself marks the timeline stale.
 ---@param project gaanim.Project
 ---@param delay? integer
 function M.update(project, delay)
   inspect_timer:stop()
   inspect_timer:start(delay or 600, 0, function()
     vim.schedule(function()
-      local inspect = require("gaanim.inspect")
-      inspect.invalidate(project.root)
-      inspect.get(project, function()
+      require("gaanim.inspect").get(project, function()
         M.refresh(project.root)
       end)
     end)

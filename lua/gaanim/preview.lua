@@ -42,6 +42,7 @@ M.animating_ns = vim.api.nvim_create_namespace("gaanim.animating")
 ---@field duration? number
 ---@field playhead? gaanim.Playhead
 ---@field queue table[] Commands waiting for the scene to be ready
+---@field sends_timeline? boolean Its `ready` events carry the timeline
 
 ---@type table<string, gaanim.PreviewStatus>
 M.status = {}
@@ -322,6 +323,15 @@ function M.launch(opts)
         set("reloading", object.cause)
       elseif event == "ready" then
         status.duration = object.duration
+        -- Newer Gaanim sends the scene's timeline with each `ready`, the
+        -- same object `gaanim inspect --json` prints: no second run needed.
+        if type(object.timeline) == "table" and object.timeline.segments then
+          status.sends_timeline = true
+          require("gaanim.inspect").store(project, object.timeline)
+          if package.loaded["gaanim.server"] then
+            require("gaanim.server").refresh(project.root)
+          end
+        end
         ready(status.duration and ("%.1f s"):format(status.duration) or nil)
       elseif kind == "reload" and object.phase == "end" and not listen then
         ready(object.seconds and ("reloaded in %.2f s"):format(object.seconds) or nil)

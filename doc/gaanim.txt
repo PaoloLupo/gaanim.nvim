@@ -37,7 +37,10 @@ offers:
   `inspect`             |:Gaanim-timeline|, the instant of the cursor's line,
                       stills at the cursor
   names in `export`     stills and ranges of the slide under the cursor
-Without them the plugin restarts the preview from the cursor's segment and
+While a preview with `--listen` is open, each `ready` carries the scene's
+timeline (the object `inspect --json` prints): the plugin takes it, and after
+a save waits for it instead of running the scene again through `inspect`.
+Without these the plugin restarts the preview from the cursor's segment and
 reads the CLI's text output.
 
 ==============================================================================
@@ -338,8 +341,9 @@ function as `cmd`) and attaches, as `gaanim`, to the Python files of Gaanim
 projects, next to basedpyright or pyright. It offers:
 
   inlay hints     the time of each `play`, `stop`, segment, marker and
-                  voiceover at the end of its line, from `gaanim inspect`
-                  (|gaanim-caps|), refreshed after each save; hidden while
+                  voiceover at the end of its line, from the preview's
+                  `ready` or `gaanim inspect` (|gaanim-caps|), refreshed
+                  after each save; hidden while
                   the buffer has unsaved changes
   code lenses     over each slide: Preview, Still, its script's spoken time
                   against `target=` (or Write script), its time; over each

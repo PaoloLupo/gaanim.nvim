@@ -74,15 +74,73 @@ function M.cached(project)
   return entry and entry.data
 end
 
---- Calls `on_data` with the project's timeline, running `inspect` when the
---- cache is empty or stale. Without `inspect` support it gets nil.
+--- Whether a preview of the project takes commands and sends its timeline
+--- with each `ready`, so a save brings a fresh one without `inspect`.
+---@param project gaanim.Project
+---@return boolean
+local function preview_sends(project)
+  local preview = package.loaded["gaanim.preview"] and require("gaanim.preview")
+  local status = preview and preview.status[project.root]
+  return status ~= nil
+    and status.sends_timeline == true
+    and status.state ~= "failed"
+    and require("gaanim.cli").running(status.key)
+end
+
+--- Hands the timeline (or nil) to everyone waiting for one.
+---@param project gaanim.Project
+---@param entry table
+---@param data? gaanim.Timeline
+local function deliver(project, entry, data)
+  if entry.fallback then
+    entry.fallback:stop()
+    if not entry.fallback:is_closing() then
+      entry.fallback:close()
+    end
+    entry.fallback = nil
+  end
+  local waiting = entry.waiting or {}
+  entry.waiting = nil
+  for _, callback in ipairs(waiting) do
+    callback(data or entry.data)
+  end
+  vim.api.nvim_exec_autocmds("User", { pattern = "GaanimInspect", data = { root = project.root } })
+end
+
+---@param project gaanim.Project
+---@param entry table
+local function run(project, entry)
+  cli.run({ "inspect", project.target, "--json" }, {
+    cwd = project.root,
+    key = "inspect:" .. project.root,
+    on_exit = function(_, _, objects)
+      local data = M.parse(objects)
+      if data then
+        entry.data, entry.stale = data, false
+      end
+      deliver(project, entry, data)
+    end,
+  })
+end
+
+--- Takes the timeline a preview sent with `ready`: it becomes the fresh
+--- timeline of the project, and whoever waits for one gets it.
+---@param project gaanim.Project
+---@param data gaanim.Timeline
+function M.store(project, data)
+  local entry = M.cache[project.root] or { stale = true }
+  M.cache[project.root] = entry
+  entry.data, entry.stale = data, false
+  deliver(project, entry, data)
+end
+
+--- Calls `on_data` with the project's timeline. When the cache is empty or
+--- stale it waits for the next `ready` of a preview that sends timelines
+--- (running `inspect` if none comes within a few seconds), else runs
+--- `inspect`. Without either it gets the cached timeline or nil.
 ---@param project gaanim.Project
 ---@param on_data fun(data?: gaanim.Timeline)
 function M.get(project, on_data)
-  if not require("gaanim.caps").get().inspect then
-    on_data(nil)
-    return
-  end
   local entry = M.cache[project.root] or { stale = true }
   M.cache[project.root] = entry
   if entry.data and not entry.stale then
@@ -93,23 +151,27 @@ function M.get(project, on_data)
     table.insert(entry.waiting, on_data)
     return
   end
+  local can_inspect = require("gaanim.caps").get().inspect
+  if preview_sends(project) then
+    entry.waiting = { on_data }
+    entry.fallback = vim.uv.new_timer()
+    entry.fallback:start(5000, 0, function()
+      vim.schedule(function()
+        if entry.waiting and can_inspect then
+          run(project, entry)
+        elseif entry.waiting then
+          deliver(project, entry, nil)
+        end
+      end)
+    end)
+    return
+  end
+  if not can_inspect then
+    on_data(entry.data)
+    return
+  end
   entry.waiting = { on_data }
-  cli.run({ "inspect", project.target, "--json" }, {
-    cwd = project.root,
-    key = "inspect:" .. project.root,
-    on_exit = function(_, _, objects)
-      local data = M.parse(objects)
-      if data then
-        entry.data, entry.stale = data, false
-      end
-      local waiting = entry.waiting or {}
-      entry.waiting = nil
-      for _, callback in ipairs(waiting) do
-        callback(data or entry.data)
-      end
-      vim.api.nvim_exec_autocmds("User", { pattern = "GaanimInspect", data = { root = project.root } })
-    end,
-  })
+  run(project, entry)
 end
 
 --- Marks a project's timeline as stale after a save.

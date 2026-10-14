@@ -75,6 +75,7 @@ function M.write(buf)
   if not project then
     return
   end
+  require("gaanim.inspect").invalidate(project.root)
   require("gaanim.server").update(project)
   if package.loaded["gaanim.script"] then
     require("gaanim.script").refresh(buf)

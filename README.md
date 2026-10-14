@@ -103,8 +103,11 @@ offers. Driving the preview (`here` without a restart, `follow`, `seek`,
 `play`, the playhead) needs `--listen`; exact diagnostic lines and export
 percent need `--message-format json`; `timeline`, the cursor's instant and
 stills at the cursor need `inspect`; stills and ranges by slide name need
-`export` to take names. Without them, `preview here` restarts the preview
-from the cursor's segment and the rest reads the CLI's text output.
+`export` to take names. While a preview is open, Gaanim sends the scene's
+timeline with each reload (`ready`), so the times in the code update after a
+save without running the scene a second time; `inspect` covers the rest.
+Without these, `preview here` restarts the preview from the cursor's segment
+and the rest reads the CLI's text output.
 
 ## Install
 

@@ -107,6 +107,37 @@ describe("inspect", function()
   end)
 end)
 
+describe("timeline from the preview", function()
+  it("waits for the next ready instead of running inspect", function()
+    local project = project_mod.load(root)
+    local preview = require("gaanim.preview")
+    local cli = require("gaanim.cli")
+    local key = "preview:" .. project.root
+    cli.jobs[key] = {
+      is_closing = function()
+        return false
+      end,
+    }
+    preview.status[project.root] = { state = "ready", key = key, listen = true, sends_timeline = true, queue = {} }
+    local old = timeline()
+    inspect.cache[project.root] = { data = old, stale = true }
+    local got
+    inspect.get(project, function(data)
+      got = data
+    end)
+    eq(nil, got, "nothing until the preview sends a timeline")
+    eq(nil, cli.jobs["inspect:" .. project.root], "no inspect run")
+    local new = vim.deepcopy(old)
+    new.duration = 9
+    inspect.store(project, new)
+    eq(9, got and got.duration)
+    eq(false, inspect.cache[project.root].stale)
+    cli.jobs[key] = nil
+    preview.status[project.root] = nil
+    inspect.cache[project.root] = nil
+  end)
+end)
+
 describe("preview control", function()
   local preview = require("gaanim.preview")
   local cli = require("gaanim.cli")
