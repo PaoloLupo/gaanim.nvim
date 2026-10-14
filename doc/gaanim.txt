@@ -10,6 +10,7 @@ CONTENTS                                                     *gaanim-contents*
   5. Configuration ............................. |gaanim-config|
   6. Statusline and events ..................... |gaanim-statusline|
   7. Back to the code from Gaanim .............. |gaanim-remote|
+  8. Typst math completion ..................... |gaanim-typst|
 
 ==============================================================================
 1. INTRODUCTION                                                 *gaanim-intro*
@@ -220,5 +221,40 @@ script error panel's "Open in the editor". Previews started from Neovim get
 a `GAANIM_EDITOR` that calls this Neovim through its RPC server
 (|v:servername|), so those jumps land here. Set `preview.editor = false` to
 keep your own `GAANIM_EDITOR`.
+
+==============================================================================
+8. TYPST MATH COMPLETION                                        *gaanim-typst*
+
+Gaanim reads Typst math in every string passed to `equation(...)`
+(`scene.text.equation("x^2 + y")`, without `$`) and in the `$...$` spans of
+other text. There, the blink.cmp source `gaanim.typst.blink` offers:
+
+  symbols     Typst's math symbols, each with the character it draws as its
+              icon. After a `.` it offers the variants of the name before it:
+              `arrow.r.` lists `double` (⇒), `long` (⟶)…
+  functions   `frac`, `binom`, `sqrt`, `root`, `vec`, `mat`, `cases`, `lr`,
+              `abs`, `norm`, `floor`, `ceil`, `attach`, `underbrace`,
+              `cancel`, `bold`, `cal`, `bb`… as snippets
+  accents     `hat(x)`, `tilde(x)`, `dot(x)`, `arrow(x)`…
+  operators   `sin`, `lim`, `log`, `max`…
+  spaces      `thin`, `med`, `thick`, `quad`, `wide`
+
+Keyword arguments such as `color="…"`, comments, f-string text and Typst
+code after `#` get nothing. The symbol names come from codex 0.3.0, the
+version Gaanim's Typst uses; `scripts/gen_typst_symbols.py` regenerates
+`lua/gaanim/typst/symbols.lua` from another codex.
+
+Register the source in blink.cmp:
+>lua
+  sources = {
+    default = { "lsp", "path", "snippets", "buffer", "gaanim_typst" },
+    providers = {
+      gaanim_typst = { name = "Typst", module = "gaanim.typst.blink",
+                       score_offset = 20 },
+    },
+  }
+<
+Other completion plugins can call `require("gaanim.typst").items_at(buf,
+{row, col})`, which returns LSP completion items or nil outside math.
 
  vim:tw=78:ts=8:ft=help:norl:

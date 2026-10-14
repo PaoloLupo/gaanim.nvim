@@ -49,6 +49,13 @@ exports, presents, and keeps the narration script beside the code.
 - **Docs.** `:Gaanim docs [text]` searches the documentation bundled with the
   project's Gaanim (it matches the installed version); `:Gaanim api [name]`
   opens an API entry, by default the word under the cursor.
+- **Typst math completion.** Inside the strings of `scene.text.equation(...)`
+  and the `$...$` of other text, a blink.cmp source offers Typst's math
+  symbols with the character each one draws as its icon (`α alpha`,
+  `⇒ arrow.r.double`; type `.` for a symbol's variants), its math functions
+  (`frac`, `sqrt`, `mat`, `cases`, `bold`…) as snippets, accents, text
+  operators and spaces. The names are the ones Gaanim's Typst compiles
+  (codex 0.3.0; `scripts/gen_typst_symbols.py` regenerates the table).
 - **Snippets** for scenes and scripts in `snippets/` (VS Code format).
 - **Completion.** When basedpyright or pyright attaches to a project file, it
   is pointed at the project's `.venv`, where `gaanim init` installed the
@@ -101,6 +108,22 @@ Statusline (lualine):
 
 ```lua
 { function() return require("gaanim").status() end }
+```
+
+Typst math completion with blink.cmp:
+
+```lua
+{
+  "saghen/blink.cmp",
+  opts = {
+    sources = {
+      default = { "lsp", "path", "snippets", "buffer", "gaanim_typst" },
+      providers = {
+        gaanim_typst = { name = "Typst", module = "gaanim.typst.blink", score_offset = 20 },
+      },
+    },
+  },
+}
 ```
 
 Snippets with blink.cmp: add the plugin's `snippets` folder to
