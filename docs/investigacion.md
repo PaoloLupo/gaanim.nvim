@@ -150,11 +150,14 @@ del proyecto, por ejemplo `NOMBRE = "Portada"` en cada módulo.
 
 ## Lo que Gaanim podría exponer
 
-Ordenado por lo que desbloquea:
+Ordenado por lo que desbloquea. Regla para todo lo que se pida a Gaanim: nada
+específico de Neovim entra en Gaanim ni en lo que crea `gaanim init`, y lo
+nuevo es opcional, de modo que quien no usa Neovim (o no configura un editor)
+no nota ningún cambio. La integración con Neovim vive en el plugin.
 
 Propuesto en [#529](https://github.com/PaoloLupo/gaanim/issues/529) (puntos 1–3),
 [#530](https://github.com/PaoloLupo/gaanim/issues/530) (punto 4) y
-[#531](https://github.com/PaoloLupo/gaanim/issues/531) (puntos 5 y 6); el 7 ya
+[#531](https://github.com/PaoloLupo/gaanim/issues/531) (punto 5); el 6 ya
 estaba en [#430](https://github.com/PaoloLupo/gaanim/issues/430) (subtítulos),
 [#427](https://github.com/PaoloLupo/gaanim/issues/427) (capítulos) y
 [#429](https://github.com/PaoloLupo/gaanim/issues/429) (palabras con tiempos).
@@ -180,12 +183,18 @@ estaba en [#430](https://github.com/PaoloLupo/gaanim/issues/430) (subtítulos),
    «unknown marker» y `:Gaanim still` no puede exportar «esta diapositiva».
 5. **Abrir el guion con `GAANIM_EDITOR`.** *Open and complete* abre
    `script.md` con la aplicación por defecto del sistema en vez del editor.
-6. **Proyectos listos para el editor:** `[tool.pyright] venvPath = "."` y
-   `venv = ".venv"` en el `pyproject.toml` de `gaanim init` (pyright no busca
-   el `.venv` solo).
-7. **Narración desde la CLI:** `gaanim export --captions out.srt|vtt` y un
+   Sin `GAANIM_EDITOR` ni editor de código en el PATH seguiría abriéndose
+   como hoy.
+6. **Narración desde la CLI:** `gaanim export --captions out.srt|vtt` y un
    archivo de capítulos; `gaanim narration record|transcribe <clave>` para
    reutilizar la grabadora, whisper y el formato del sidecar de la app.
+
+Descartado: añadir `[tool.pyright] venvPath = "."` y `venv = ".venv"` al
+`pyproject.toml` de `gaanim init`. Con una sección `[tool.pyright]` en el
+proyecto, pyright y Pylance ignoran los ajustes de pyright del `settings.json`
+de VS Code, y Pylance ignora `venvPath`/`venv` de todos modos: cambiaría las
+cosas para quien usa VS Code sin darle nada. El plugin apunta el servidor al
+`.venv` por su cuenta.
 
 ## Limitaciones conocidas
 
