@@ -29,14 +29,18 @@ end
 plug("gaanim-new", cmd("new"), "Gaanim: new project")
 plug("gaanim-projects", cmd("projects"), "Gaanim: open a project")
 plug("gaanim-preview", cmd("preview"), "Gaanim: live preview")
-plug("gaanim-preview-here", cmd("preview here"), "Gaanim: preview from the slide under the cursor")
+plug("gaanim-preview-here", cmd("preview here"), "Gaanim: preview at the line under the cursor")
+plug("gaanim-follow", cmd("follow"), "Gaanim: preview follows the cursor (toggle)")
+plug("gaanim-play", cmd("play"), "Gaanim: play the preview")
+plug("gaanim-pause", cmd("pause"), "Gaanim: pause the preview")
+plug("gaanim-timeline", cmd("timeline"), "Gaanim: timeline")
 plug("gaanim-preview-only", cmd("preview only"), "Gaanim: preview only the slide under the cursor")
 plug("gaanim-present", cmd("present"), "Gaanim: present")
-plug("gaanim-present-here", cmd("present here"), "Gaanim: present from the slide under the cursor")
+plug("gaanim-present-here", cmd("present here"), "Gaanim: present from the line under the cursor")
 plug("gaanim-stop", cmd("stop"), "Gaanim: close preview")
 plug("gaanim-check", cmd("check"), "Gaanim: check")
 plug("gaanim-export", cmd("export"), "Gaanim: export")
-plug("gaanim-still", cmd("still"), "Gaanim: export a still")
+plug("gaanim-still", cmd("still"), "Gaanim: export the frame at the cursor")
 plug("gaanim-outline", cmd("outline"), "Gaanim: outline")
 plug("gaanim-script", cmd("script toggle"), "Gaanim: narration script")
 plug("gaanim-script-goto", cmd("script goto"), "Gaanim: jump between script and scene")
@@ -58,13 +62,24 @@ end, "Gaanim: previous stop")
 
 local group = vim.api.nvim_create_augroup("gaanim", { clear = true })
 
+local function highlights()
+  vim.api.nvim_set_hl(0, "GaanimPlayhead", { link = "DiagnosticInfo", default = true })
+  vim.api.nvim_set_hl(0, "GaanimPlayheadText", { link = "Comment", default = true })
+end
+highlights()
+vim.api.nvim_create_autocmd("ColorScheme", { group = group, callback = highlights })
+
 -- A save in a project checks it once the saves settle; the check itself is
 -- skipped when `check.on_save` is off.
 vim.api.nvim_create_autocmd("BufWritePost", {
   group = group,
   pattern = { "*.py", "*.md", "gaanim.toml" },
   callback = function(args)
-    if vim.fs.root(args.buf, "gaanim.toml") then
+    local root = vim.fs.root(args.buf, "gaanim.toml")
+    if root then
+      if package.loaded["gaanim.inspect"] then
+        require("gaanim.inspect").invalidate(vim.fs.normalize(root))
+      end
       require("gaanim.check").on_save(args.buf)
     end
   end,
@@ -78,6 +93,9 @@ vim.api.nvim_create_autocmd("CursorMoved", {
   callback = function()
     if package.loaded["gaanim.script"] then
       require("gaanim.script").follow()
+    end
+    if package.loaded["gaanim.preview"] then
+      require("gaanim.preview").on_cursor()
     end
   end,
 })

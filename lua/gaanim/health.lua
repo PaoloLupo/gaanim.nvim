@@ -31,6 +31,18 @@ function M.check()
   else
     local version = output({ exe, "--version" })
     health.ok(("%s (%s)"):format(version or "gaanim", exe))
+    local can = require("gaanim.caps").get()
+    local function feature(on, name, what)
+      if on then
+        health.ok(name .. ": " .. what)
+      else
+        health.info(name .. " not available in this gaanim (`gaanim update` brings it): " .. what)
+      end
+    end
+    feature(can.listen, "--listen", "move the preview from Neovim, follow the cursor, mark the playhead")
+    feature(can.json, "--message-format json", "exact lines for diagnostics, export percent")
+    feature(can.inspect, "inspect", "timeline with times, the instant of each line")
+    feature(can.names, "export by name", "stills and ranges of the slide under the cursor")
   end
 
   for _, tool in ipairs({ "ffmpeg", "ffprobe" }) do

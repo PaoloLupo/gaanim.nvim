@@ -14,10 +14,9 @@ function M.setup(opts)
   require("gaanim.config").setup(opts)
 end
 
-local STATES = { starting = "◌", reloading = "↻", ready = "●", failed = "✗" }
-
---- A short status for statuslines: the slide under the cursor, the preview's
---- state and the last check, or "" outside Gaanim projects.
+--- A short status for statuslines: the slide under the cursor and the
+--- instant its line stands for, where the preview rests (and `⇄` when it
+--- follows the cursor), and the last check; "" outside Gaanim projects.
 ---@return string
 function M.status()
   local buf = vim.api.nvim_get_current_buf()
@@ -29,20 +28,49 @@ function M.status()
   if not root then
     return ""
   end
+  local icons = require("gaanim.icons").get()
   local parts = {}
   if vim.bo[buf].filetype == "python" then
     local here = require("gaanim.index").at_cursor(buf)
     if here.segment then
-      local text = "▤ " .. here.segment.name
+      local text = icons.segment .. " " .. here.segment.name
       if here.stop_index > 0 then
-        text = text .. " ⏸" .. here.stop_index
+        text = text .. " " .. icons.stop .. here.stop_index
       end
       table.insert(parts, text)
     end
   end
-  local preview = package.loaded["gaanim.preview"] and require("gaanim.preview").status[root]
+  local inspect = package.loaded["gaanim.inspect"] and require("gaanim.inspect")
+  local data = inspect and inspect.cache[root] and inspect.cache[root].data
+  if data and vim.bo[buf].filetype == "python" then
+    local point = inspect.point_at(data, vim.api.nvim_buf_get_name(buf), vim.api.nvim_win_get_cursor(0)[1])
+    if point then
+      table.insert(parts, icons.time .. " " .. require("gaanim.outline").clock(point.time))
+    end
+  end
+  local preview_mod = package.loaded["gaanim.preview"] and require("gaanim.preview")
+  local preview = preview_mod and preview_mod.status[root]
   if preview then
-    table.insert(parts, STATES[preview.state] .. " " .. preview.state)
+    local playhead = preview.playhead
+    if playhead and preview.state == "ready" then
+      local text = (playhead.playing and icons.playing or icons.paused)
+        .. " "
+        .. require("gaanim.outline").clock(playhead.time)
+      if playhead.segment then
+        text = text .. " " .. playhead.segment
+      end
+      if playhead.stop and playhead.stop ~= "" then
+        text = text .. "·" .. playhead.stop
+      end
+      table.insert(parts, text)
+    else
+      local state =
+        { starting = icons.starting, reloading = icons.reloading, ready = icons.playing, failed = icons.failed }
+      table.insert(parts, state[preview.state] .. " " .. preview.state)
+    end
+    if preview_mod.following[root] then
+      table.insert(parts, icons.follow)
+    end
   end
   local check = package.loaded["gaanim.check"] and require("gaanim.check").last[root]
   if check then

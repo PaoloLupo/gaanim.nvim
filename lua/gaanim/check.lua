@@ -171,6 +171,80 @@ function M.parse(project, lines)
   return report
 end
 
+---@param seconds number
+---@return string
+local function seconds_text(seconds)
+  return ("%.1f s"):format(seconds)
+end
+
+--- Turns the JSON lines of `--message-format json` into a report. Gaanim
+--- gives each diagnostic its file and line; a traceback (on stderr, in
+--- `lines`) still places a script that failed to load.
+---@param project gaanim.Project
+---@param objects table[]
+---@param lines? string[]
+---@return gaanim.Report
+function M.from_json(project, objects, lines)
+  local report = { status = "pass", summary = "", items = {} }
+  local fallback = project.manifest or project.entry
+  for _, object in ipairs(objects) do
+    if object.type == "diagnostic" or (object.type == "message" and object.level == "error") then
+      local failed = object.level == "error"
+      local file, lnum = object.file and vim.fs.normalize(object.file), object.line
+      local message = object.message or ""
+      if not file and message:find("Traceback", 1, true) then
+        -- A script that failed to load: its traceback is in the message.
+        local frame, exception = M.traceback(vim.split(message, "\n"), project.root)
+        if frame then
+          file, lnum = frame.file, frame.lnum
+        end
+        object.message = exception or message
+      end
+      if not file then
+        if failed and lines then
+          local frame = M.traceback(lines, project.root)
+          if frame then
+            file, lnum = frame.file, frame.lnum
+          end
+        else
+          file, lnum = M.locate(project, object.message or "")
+        end
+      end
+      table.insert(report.items, {
+        filename = file or fallback,
+        lnum = lnum or 1,
+        col = object.column or 1,
+        type = failed and "E" or "W",
+        text = object.message or "",
+      })
+      if failed then
+        report.status = "error"
+        report.summary = object.message or report.summary
+      elseif report.status == "pass" then
+        report.status = "warning"
+      end
+    elseif object.type == "check" then
+      local parts = {}
+      if object.segments then
+        table.insert(parts, ("%d segments"):format(object.segments))
+      end
+      if object.stops then
+        table.insert(parts, ("%d stops"):format(object.stops))
+      end
+      if object.duration then
+        table.insert(parts, seconds_text(object.duration))
+      end
+      if report.status ~= "error" then
+        report.summary = (object.result == "fail" and "fail" or "ready") .. " · " .. table.concat(parts, " · ")
+      end
+      if object.result == "fail" and report.status ~= "error" then
+        report.status = "error"
+      end
+    end
+  end
+  return report
+end
+
 ---@type table<string, integer[]> Buffers that got diagnostics, per project
 local marked = {}
 
@@ -220,15 +294,18 @@ function M.run(opts)
   if config.get().check.strict then
     table.insert(args, "--strict")
   end
+  if require("gaanim.caps").get().json then
+    vim.list_extend(args, { "--message-format", "json" })
+  end
   cli.run(args, {
     cwd = project.root,
     key = key,
-    on_exit = function(code, lines)
-      if code ~= 0 and code ~= 1 and #M.entries(lines) == 0 then
+    on_exit = function(code, lines, objects)
+      if code ~= 0 and code ~= 1 and #objects == 0 and #M.entries(lines) == 0 then
         cli.notify("gaanim check failed; see :Gaanim log", vim.log.levels.ERROR)
         return
       end
-      local report = M.parse(project, lines)
+      local report = #objects > 0 and M.from_json(project, objects, lines) or M.parse(project, lines)
       M.last[project.root] = report
       M.publish(project, report)
       local mode = config.get().check.quickfix

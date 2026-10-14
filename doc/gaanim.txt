@@ -20,9 +20,23 @@ with a `gaanim.toml`; a Python file that imports gaanim outside any project is
 a project of its own. The plugin needs no |setup()|: |:Gaanim| and the
 |<Plug>| mappings exist once it is on 'runtimepath'.
 
-Requirements: Neovim 0.10+ (0.12 shows exports as progress messages) and
-`gaanim` on PATH. snacks.nvim is optional and gives the pickers a preview.
-Run |:checkhealth| gaanim to see what is found.
+Requirements: Neovim 0.10+ (0.12 shows exports as progress messages), a
+Nerd Font for the default icons (see `icons` in |gaanim-config|) and `gaanim`
+on PATH. snacks.nvim is optional and gives the pickers a preview. Run
+|:checkhealth| gaanim to see what is found.
+
+                                                                 *gaanim-caps*
+The plugin reads `gaanim --help` once and uses what the installed version
+offers:
+  `--listen`            drive the preview: `preview here` without a restart,
+                      |:Gaanim-follow|, |:Gaanim-seek|, play, pause, and the
+                      playhead in the code and the statusline
+  `--message-format`    exact diagnostic lines and export percent
+  `inspect`             |:Gaanim-timeline|, the instant of the cursor's line,
+                      stills at the cursor
+  names in `export`     stills and ranges of the slide under the cursor
+Without them the plugin restarts the preview from the cursor's segment and
+reads the CLI's text output.
 
 ==============================================================================
 2. COMMANDS                                                  *gaanim-commands*
@@ -42,15 +56,33 @@ Run |:checkhealth| gaanim to see what is found.
 
 :Gaanim preview [here|only]                                *:Gaanim-preview*
                         Open the live preview. It reloads when a project
-                        file is saved. `here` starts at the segment (or
-                        Section key) under the cursor, `only` plays just that
-                        one. Running it again with other arguments restarts
-                        the preview. A failed reload puts the Python error on
-                        its line as a diagnostic.
+                        file is saved. `here` moves it to the instant the
+                        line under the cursor stands for (the `play` ending
+                        there, a stop, a marker, a voiceover's start, a
+                        segment's first stop), opening it when it is closed.
+                        `only` plays just the segment under the cursor. A
+                        failed reload puts the Python error on its line as a
+                        diagnostic, and a sign marks the line the preview
+                        rests at.
+
+:Gaanim follow [on|off]                                     *:Gaanim-follow*
+                        The preview follows the cursor: each line you stop
+                        on moves it to that line's instant. Toggles without
+                        an argument. The statusline shows the follow icon.
+
+:Gaanim seek {seconds|segment|stop}                           *:Gaanim-seek*
+                        Rest the preview at a time, at a segment or Section
+                        key (its first stop), or at a named stop.
+
+:Gaanim play                                                  *:Gaanim-play*
+:Gaanim pause                                                *:Gaanim-pause*
+                        Play the preview from where it rests, or pause it.
 
 :Gaanim present [here] [{duration}] [monitor={n}]          *:Gaanim-present*
                         Present fullscreen with Presenter View. {duration}
                         is the planned length, such as `20m` or `1h30m`.
+                        `here` starts at the cursor's line. While you
+                        present, the script window follows the slide shown.
 
 :Gaanim stop                                                  *:Gaanim-stop*
                         Close the preview or presentation of the project.
@@ -61,10 +93,11 @@ Run |:checkhealth| gaanim to see what is found.
                         segment or stop they name. Saving a project file
                         runs it in the background (|gaanim-config| `check`).
 
-:Gaanim export [{preset}|{output}] [{options}]              *:Gaanim-export*
+:Gaanim export [{preset}|{output}] [here] [{options}]       *:Gaanim-export*
                                                                *gaanim-export*
                         Export with a preset, or to {output} whose extension
-                        picks the format. {options} go to `gaanim export`:
+                        picks the format. `here` limits it to the slide under
+                        the cursor. {options} go to `gaanim export`:
                         `--from`, `--to`, `--fps`, `--width`, `--height`,
                         `--quality`, `--transparent`, `--fit`, `--notes`.
                         Presets write to the project's `output_dir`:
@@ -78,12 +111,24 @@ Run |:checkhealth| gaanim to see what is found.
                           still       one PNG at a marker or time
                         Without arguments, pick a preset.
 
-:Gaanim still [{seconds}|{marker}]                           *:Gaanim-still*
-                        Export one PNG of that instant.
+:Gaanim still [{seconds}|{name}|pick]                        *:Gaanim-still*
+                        Export one PNG. Without an argument, the instant the
+                        cursor's line stands for, named after it
+                        (`talk-question.png`); `pick` asks for a marker or a
+                        time.
+
+:Gaanim timeline                                          *:Gaanim-timeline*
+                        The timeline `gaanim inspect` reports: segments with
+                        their stops, markers and voiceovers, with times.
+                        Picking an entry jumps to its line and moves the
+                        preview there. It runs the scene, so names built at
+                        run time appear too.
 
 :Gaanim outline [{kind}...]                                *:Gaanim-outline*
                         Jump to a segment, section, voiceover, stop or
-                        marker of the project. {kind} limits the list.
+                        marker of the project, read from the Python without
+                        running it. {kind} limits the list. A preview that
+                        takes commands moves there too.
 
 :Gaanim script [open|toggle|goto]                           *:Gaanim-script*
                         See |gaanim-script|. Without an argument, toggle.
@@ -113,6 +158,8 @@ No keys are mapped. Map these in normal mode:
   <Plug>(gaanim-still)          <Plug>(gaanim-outline)
   <Plug>(gaanim-script)         <Plug>(gaanim-script-goto)
   <Plug>(gaanim-docs)           <Plug>(gaanim-api)
+  <Plug>(gaanim-follow)         <Plug>(gaanim-timeline)
+  <Plug>(gaanim-play)           <Plug>(gaanim-pause)
   <Plug>(gaanim-log)
 
 Motions in the current buffer, taking a count:
@@ -164,6 +211,9 @@ plugin loads. Defaults:
       args = {},              -- extra arguments for every preview
       stop_on_exit = true,    -- close previews when Neovim exits
       editor = true,          -- |gaanim-remote|
+      listen = true,          -- drive it with --listen stdio (|gaanim-caps|)
+      marker = true,          -- sign on the line the preview rests at
+      follow_delay = 120,     -- ms the cursor settles before |:Gaanim-follow|
     },
     present = { duration = nil, monitor = nil },
     check = {
@@ -189,6 +239,8 @@ plugin loads. Defaults:
                  "snapshots", "node_modules", ".ruff_cache" },
     },
     picker = "auto",          -- "snacks" or "select"
+    icons = "nerd",           -- Nerd Font icons; "unicode" without one, or
+                              -- a table overriding some: { segment = "▤" }
     lsp = true,               -- point pyright/basedpyright at the
                               -- project's .venv, where the stubs are
   }
@@ -204,13 +256,25 @@ projects that name slides their own way. For one module per slide with
 ==============================================================================
 6. STATUSLINE AND EVENTS                                   *gaanim-statusline*
 
-`require("gaanim").status()` returns the slide and stop under the cursor, the
-preview's state (`◌ starting`, `↻ reloading`, `● ready`, `✗ failed`) and the
-last check (`✓`, `!n`, `✗`), or "" outside projects.
+`require("gaanim").status()` returns, or "" outside projects:
+  - the slide and stop under the cursor
+  - the instant the cursor's line stands for, once |:Gaanim-timeline| (or a
+    still at the cursor) has run `gaanim inspect`
+  - where the preview rests (`0:01.8 Problem·question`, playing or paused),
+    or its state while it starts, reloads or failed, and the follow icon
+    while it follows the cursor
+  - the last check (`✓`, `!n`, `✗`)
+Show it only once the plugin has loaded, so the statusline does not load
+it: `cond = function() return vim.g.loaded_gaanim == true end`.
 
-                                                *GaanimCheck* *GaanimPreview*
-|User| events: `GaanimCheck` after each check, with `data.report`, and
-`GaanimPreview` on each line the preview prints, with `data.root`.
+                  *GaanimCheck* *GaanimPreview* *GaanimPlayhead* *GaanimInspect*
+|User| events: `GaanimCheck` after each check, with `data.report`;
+`GaanimPreview` when the preview's state changes, with `data.root`;
+`GaanimPlayhead` when it moves, with `data.playhead` ({time}, {segment},
+{stop}, {playing}); `GaanimInspect` when `gaanim inspect` returns.
+
+Highlights: `GaanimPlayhead` (the sign) and `GaanimPlayheadText` (the text
+after the line), linked to `DiagnosticInfo` and `Comment`.
 
 ==============================================================================
 7. BACK TO THE CODE FROM GAANIM                                *gaanim-remote*

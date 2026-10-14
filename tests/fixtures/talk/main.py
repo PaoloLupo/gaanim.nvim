@@ -20,9 +20,9 @@ problem = scene.segment(
     template=lecture,
     target=60,
 )
-scene.stop("question")
+scene.wait(0.5); scene.stop("question")
 scene.marker("answer")
-scene.stop()
+scene.wait(0.5); scene.stop()
 
 closing = scene.segment("Closing", notes="Thanks.", target=1.5 * 60)
 with scene.voiceover("outro") as vo:

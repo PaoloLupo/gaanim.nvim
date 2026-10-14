@@ -96,7 +96,7 @@ function M.projects()
     return {
       text = project.name,
       hint = project.kind .. "  " .. vim.fn.fnamemodify(project.root, ":~"),
-      icon = project.kind == "slides" and "▤" or "▶",
+      icon = require("gaanim.icons").get()[project.kind == "slides" and "slides" or "video"],
       file = project.entry,
       lnum = 1,
       value = project,

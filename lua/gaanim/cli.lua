@@ -114,11 +114,14 @@ end
 ---@field cwd? string
 ---@field key? string Tracks the process under this key (one at a time per key)
 ---@field env? table<string, string> Added to the inherited environment
+---@field stdin? boolean Keep stdin open, for `M.send`
+---@field on_json? fun(object: table) Lines that are JSON objects go here, not to `on_line`
 ---@field on_line? fun(line: string)
----@field on_exit? fun(code: integer, lines: string[])
+---@field on_exit? fun(code: integer, lines: string[], objects: table[])
 
 --- Runs `gaanim <args>` asynchronously. Output goes to the log and, line by
---- line, to `on_line`; `on_exit` gets the exit code and every line.
+--- line, to `on_line` (or `on_json` for JSON objects); `on_exit` gets the
+--- exit code, every line and every JSON object.
 ---@param args string[]
 ---@param opts? gaanim.RunOpts
 ---@return vim.SystemObj?
@@ -129,11 +132,21 @@ function M.run(args, opts)
     return nil
   end
   vim.list_extend(cmd, args)
-  local lines = {}
+  local lines, objects = {}, {}
   append({ "", "$ " .. table.concat(cmd, " ") })
   local function on_line(line)
     table.insert(lines, line)
     append({ line })
+    if line:sub(1, 1) == "{" then
+      local ok, object = pcall(vim.json.decode, line, { luanil = { object = true, array = true } })
+      if ok and type(object) == "table" then
+        table.insert(objects, object)
+        if opts.on_json then
+          opts.on_json(object)
+        end
+        return
+      end
+    end
     if opts.on_line then
       opts.on_line(line)
     end
@@ -150,7 +163,7 @@ function M.run(args, opts)
       if opts.on_exit then
         -- Let the last scheduled output lines land first.
         vim.schedule(function()
-          opts.on_exit(result.code, lines)
+          opts.on_exit(result.code, lines, objects)
         end)
       end
     end)
@@ -160,6 +173,7 @@ function M.run(args, opts)
       cwd = opts.cwd,
       env = vim.tbl_extend("force", { NO_COLOR = "1" }, opts.env or {}),
       text = true,
+      stdin = opts.stdin or nil,
       stdout = reader,
       stderr = reader,
     }, on_exit)
@@ -172,6 +186,22 @@ function M.run(args, opts)
     M.jobs[opts.key] = job
   end
   return job
+end
+
+--- Sends one JSON line to the stdin of the process under `key`.
+---@param key string
+---@param object table
+---@return boolean sent
+function M.send(key, object)
+  local job = M.jobs[key]
+  if not job or job:is_closing() then
+    return false
+  end
+  local ok = pcall(job.write, job, vim.json.encode(object) .. "\n")
+  if ok then
+    append({ "> " .. vim.json.encode(object) })
+  end
+  return ok
 end
 
 ---@param key string

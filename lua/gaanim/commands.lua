@@ -34,12 +34,13 @@ M.subcommands = {
     desc = "Open the live preview: preview [here|only]",
     run = function(args)
       local preview = require("gaanim.preview")
-      if args[1] == "here" or args[1] == "only" then
+      if args[1] == "here" then
+        preview.here()
+      elseif args[1] == "only" then
         local slide = preview.slide_at_cursor()
-        if not slide then
-          return
+        if slide then
+          preview.launch({ sections = { slide } })
         end
-        preview.launch(args[1] == "here" and { from = slide } or { sections = { slide } })
       else
         preview.launch({ args = args })
       end
@@ -55,9 +56,13 @@ M.subcommands = {
       local opts = { present = true }
       for _, arg in ipairs(args) do
         if arg == "here" then
-          opts.from = preview.slide_at_cursor()
-          if not opts.from then
-            return
+          if require("gaanim.caps").get().listen and require("gaanim.config").get().preview.listen then
+            opts.follow = { file = vim.fs.normalize(vim.api.nvim_buf_get_name(0)), line = vim.fn.line(".") }
+          else
+            opts.from = preview.slide_at_cursor()
+            if not opts.from then
+              return
+            end
           end
         elseif arg:match("^%d+[hms]") then
           opts.duration = arg
@@ -69,6 +74,63 @@ M.subcommands = {
     end,
     complete = function(arglead)
       return filter({ "here", "20m", "45m", "1h", "monitor=1" }, arglead)
+    end,
+  },
+  follow = {
+    desc = "Make the preview follow the cursor: follow [on|off]",
+    run = function(args)
+      local on = args[1] == "on" or (args[1] ~= "off" and nil)
+      require("gaanim.preview").follow(on)
+    end,
+    complete = function(arglead, args)
+      return #args <= 1 and filter({ "on", "off" }, arglead) or {}
+    end,
+  },
+  seek = {
+    desc = "Move the preview: seek {seconds|segment|stop}",
+    run = function(args)
+      if #args == 0 then
+        vim.notify("Usage: :Gaanim seek {seconds|segment|stop}", vim.log.levels.WARN, { title = "Gaanim" })
+        return
+      end
+      require("gaanim.preview").seek(table.concat(args, " "))
+    end,
+    complete = function(arglead)
+      local project = require("gaanim.project").current()
+      if not project then
+        return {}
+      end
+      local names, seen = {}, {}
+      for _, symbol in ipairs(require("gaanim.index").project_symbols(project)) do
+        local name = symbol.name
+        if
+          name
+          and not seen[name]
+          and (symbol.kind == "segment" or symbol.kind == "section" or symbol.kind == "stop")
+        then
+          seen[name] = true
+          table.insert(names, name)
+        end
+      end
+      return filter(names, arglead)
+    end,
+  },
+  play = {
+    desc = "Play the preview from where it rests",
+    run = function()
+      require("gaanim.preview").play(true)
+    end,
+  },
+  pause = {
+    desc = "Pause the preview",
+    run = function()
+      require("gaanim.preview").play(false)
+    end,
+  },
+  timeline = {
+    desc = "The timeline from gaanim inspect, with times; jump and seek",
+    run = function()
+      require("gaanim.outline").timeline()
     end,
   },
   stop = {
@@ -84,7 +146,7 @@ M.subcommands = {
     end,
   },
   export = {
-    desc = "Export: export [preset|output.ext] [gaanim export options]",
+    desc = "Export: export [preset|output.ext] [here] [gaanim export options]",
     run = function(args)
       require("gaanim.export").export(args[1], vim.list_slice(args, 2))
     end,
@@ -92,21 +154,34 @@ M.subcommands = {
       if #args <= 1 then
         return filter(require("gaanim.export").preset_names(), arglead)
       end
-      return filter(
-        { "--from", "--to", "--fps", "--width", "--height", "--quality", "--transparent", "--fit", "--notes" },
-        arglead
-      )
+      return filter({
+        "here",
+        "--from",
+        "--to",
+        "--fps",
+        "--width",
+        "--height",
+        "--quality",
+        "--transparent",
+        "--fit",
+        "--notes",
+      }, arglead)
     end,
   },
   still = {
-    desc = "Export one PNG: still [seconds|marker]",
+    desc = "Export one PNG: still [seconds|name|pick] (default: the cursor's instant)",
     run = function(args)
       local export = require("gaanim.export")
-      if args[1] then
+      if args[1] == "pick" then
+        export.export("still")
+      elseif args[1] then
         export.export("still", { "--frame", args[1] })
       else
-        export.export("still")
+        export.still_here()
       end
+    end,
+    complete = function(arglead, args)
+      return #args <= 1 and filter({ "pick" }, arglead) or {}
     end,
   },
   outline = {

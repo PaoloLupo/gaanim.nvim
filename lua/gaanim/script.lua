@@ -420,6 +420,7 @@ function M.decorate(project)
       })
     end
   end
+  local voice = require("gaanim.icons").get().voiceover
   for _, file in ipairs(project_mod.python_files(project)) do
     local code = vim.fn.bufnr(file)
     if code ~= -1 and vim.api.nvim_buf_is_loaded(code) then
@@ -430,9 +431,12 @@ function M.decorate(project)
           local chunks = {}
           if section then
             local seconds = M.spoken(section.words)
-            table.insert(chunks, { "  ♪ " .. pace_text(seconds, symbol.target), pace_hl(seconds, symbol.target) })
+            table.insert(
+              chunks,
+              { "  " .. voice .. " " .. pace_text(seconds, symbol.target), pace_hl(seconds, symbol.target) }
+            )
           elseif symbol.kind ~= "section" then
-            table.insert(chunks, { "  ♪ no script", "Comment" })
+            table.insert(chunks, { "  " .. voice .. " no script", "Comment" })
           end
           if symbol.kind == "voiceover" then
             local recorded = M.has_take(project, symbol.name)
@@ -525,6 +529,34 @@ function M.follow()
     end
     M.reveal(win, lnum)
   end
+end
+
+--- Scrolls the script window to the slide the preview shows: the mark of
+--- its stop when the stop has a name, else its section.
+---@param project gaanim.Project
+---@param segment string
+---@param stop? string
+function M.show_slide(project, segment, stop)
+  local path, exists = M.path(project)
+  local win = exists and path and script_window(path)
+  if not win then
+    return
+  end
+  local buf = vim.api.nvim_win_get_buf(win)
+  local section = M.find_section(M.parse(vim.api.nvim_buf_get_lines(buf, 0, -1, false)), segment)
+  if not section then
+    return
+  end
+  local lnum = section.lnum
+  if stop and stop ~= "" then
+    for _, mark in ipairs(section.marks) do
+      if mark.name:lower() == stop:lower() then
+        lnum = mark.lnum
+        break
+      end
+    end
+  end
+  M.reveal(win, lnum)
 end
 
 --- Jumps between a slide's code and its section: from the code to the

@@ -19,6 +19,7 @@ local M = {}
 ---@field script gaanim.ScriptConfig
 ---@field outline gaanim.OutlineConfig
 ---@field picker "auto"|"snacks"|"select"
+---@field icons "nerd"|"unicode"|table Nerd Font icons, plain characters, or overrides
 ---@field lsp boolean Point pyright/basedpyright at the project's .venv
 
 ---@class gaanim.NewConfig
@@ -29,6 +30,9 @@ local M = {}
 ---@field args string[] Extra arguments for every preview
 ---@field stop_on_exit boolean Close previews when Neovim exits
 ---@field editor boolean Make Gaanim's "Open in the editor" open lines in this Neovim
+---@field listen boolean Drive the preview through `--listen stdio` when Gaanim has it
+---@field marker boolean Mark the line the preview rests at
+---@field follow_delay integer Milliseconds a following preview waits for the cursor to settle
 
 ---@class gaanim.PresentConfig
 ---@field duration? string Planned length, e.g. "20m"
@@ -64,7 +68,7 @@ M.defaults = {
   cmd = "gaanim",
   projects_dir = nil,
   new = { cd = "tcd", git = false },
-  preview = { args = {}, stop_on_exit = true, editor = true },
+  preview = { args = {}, stop_on_exit = true, editor = true, listen = true, marker = true, follow_delay = 120 },
   present = { duration = nil, monitor = nil },
   check = { on_save = true, strict = false, debounce = 400, quickfix = "errors" },
   export = {
@@ -89,6 +93,7 @@ M.defaults = {
     ignore = { ".venv", "venv", ".git", "__pycache__", "exports", "snapshots", "node_modules", ".ruff_cache" },
   },
   picker = "auto",
+  icons = "nerd",
   lsp = true,
 }
 
