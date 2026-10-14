@@ -86,23 +86,24 @@ describe("language server", function()
     close()
   end)
 
-  it("drops shown hints as soon as a line is edited", function()
+  it("hears each edit, so the client asks for hints again", function()
     local buf = open()
-    vim.lsp.inlay_hint.enable(true, { bufnr = buf })
-    local count = function()
-      return #vim.tbl_filter(function(h)
-        return vim.lsp.get_client_by_id(h.client_id).name == "gaanim"
-      end, vim.lsp.inlay_hint.get({ bufnr = buf }))
-    end
-    vim.wait(2000, function()
-      return count() > 0
-    end, 20)
-    assert(count() > 0, "hints are shown")
+    local client = vim.lsp.get_clients({ bufnr = buf, name = "gaanim" })[1]
+    eq(2, client.server_capabilities.textDocumentSync.change)
+    local notified = false
+    vim.api.nvim_create_autocmd("LspNotify", {
+      buffer = buf,
+      callback = function(args)
+        if args.data.client_id == client.id and args.data.method == "textDocument/didChange" then
+          notified = true
+        end
+      end,
+    })
     vim.api.nvim_buf_set_text(buf, 12, 0, 12, 20, { "" })
     vim.wait(2000, function()
-      return count() == 0
+      return notified
     end, 20)
-    eq(0, count(), "an edit re-requests hints, which wait for the save")
+    eq(true, notified, "an edit reaches the server, and hints wait for the save")
     close()
   end)
 
