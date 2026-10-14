@@ -36,6 +36,11 @@ function _G.eq(expected, actual, message)
   end
 end
 
+--- A path as the system writes it: with backslashes on Windows.
+function _G.native(path)
+  return vim.fn.has("win32") == 1 and (path:gsub("/", "\\")) or path
+end
+
 local filter = arg[1]
 local specs = vim.fn.glob(vim.fs.joinpath(root, "tests", "spec", "*_spec.lua"), false, true)
 table.sort(specs)

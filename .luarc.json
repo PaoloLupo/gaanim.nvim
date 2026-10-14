@@ -3,5 +3,5 @@
   "runtime.version": "LuaJIT",
   "workspace.library": ["$VIMRUNTIME/lua", "${3rd}/luv/library"],
   "workspace.checkThirdParty": false,
-  "diagnostics.globals": ["vim", "Snacks", "describe", "it", "eq", "FIXTURES"]
+  "diagnostics.globals": ["vim", "Snacks", "describe", "it", "eq", "native", "FIXTURES"]
 }

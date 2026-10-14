@@ -40,7 +40,7 @@ describe("JSON messages", function()
         type = "diagnostic",
         level = "warning",
         message = "segment `Problem` contains unnamed stops",
-        file = main:gsub("/", "\\"),
+        file = native(main),
         line = 17,
       },
       { type = "check", result = "pass", errors = 0, warnings = 1, segments = 3, stops = 4, duration = 2.8 },

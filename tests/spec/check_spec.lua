@@ -45,7 +45,7 @@ describe("check", function()
       "  ✗ check     could not load project: Traceback (most recent call last):",
       '  File "<string>", line 3, in <module>',
       '  File "<frozen runpy>", line 287, in run_path',
-      '  File "' .. main:gsub("/", "\\") .. '", line 13, in <module>',
+      '  File "' .. native(main) .. '", line 13, in <module>',
       "    scene.play([title.animate.wrte()])",
       "AttributeError: 'Anim' object has no attribute 'wrte'",
     })
