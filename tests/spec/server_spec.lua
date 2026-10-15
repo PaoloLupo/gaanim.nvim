@@ -107,6 +107,57 @@ describe("language server", function()
     close()
   end)
 
+  it("keeps another server's hints within a line it has not seen shortened", function()
+    local buf = open()
+    -- A server like basedpyright: it answers once, then is slow after edits.
+    local answered = false
+    vim.lsp.start({
+      name = "other",
+      cmd = function()
+        return {
+          request = function(method, _, callback)
+            if method == "initialize" then
+              vim.schedule(function()
+                callback(nil, { capabilities = { inlayHintProvider = true, textDocumentSync = 2 } })
+              end)
+            elseif method == "textDocument/inlayHint" and not answered then
+              answered = true
+              local line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+              vim.schedule(function()
+                callback(nil, { { position = { line = 0, character = #line }, label = "x" } })
+              end)
+            end
+            return true, 1
+          end,
+          notify = function()
+            return true
+          end,
+          is_closing = function()
+            return false
+          end,
+          terminate = function() end,
+        }
+      end,
+    }, { bufnr = buf })
+    local function other_hint()
+      for _, item in ipairs(vim.lsp.inlay_hint.get({ bufnr = buf })) do
+        if vim.lsp.get_client_by_id(item.client_id).name == "other" then
+          return item.inlay_hint
+        end
+      end
+    end
+    vim.wait(2000, function()
+      return other_hint() ~= nil
+    end, 20)
+    -- gaanim answers the edit at once; the other server never does.
+    vim.api.nvim_buf_set_text(buf, 0, 0, 0, 5, { "" })
+    vim.wait(300)
+    local line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+    eq(true, other_hint().position.character <= #line, "the hint is drawn within its line")
+    vim.lsp.get_clients({ bufnr = buf, name = "other" })[1]:stop(true)
+    close()
+  end)
+
   it("hides hints while the buffer has unsaved changes", function()
     local buf = open()
     vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "# changed" })

@@ -185,6 +185,41 @@ function M.update(project, delay)
   end)
 end
 
+local guarded = false
+
+--- Neovim 0.12 draws the hints of every client once any of them answers for
+--- the buffer's new version, the others' still at the columns of the old
+--- text. This server answers at once, so after an edit that shortens a line
+--- basedpyright's hints land past its end and the decoration provider fails
+--- with "Invalid 'col': out of range". After each answer, every stored hint
+--- is kept within its line until its own client answers again.
+function M.guard_hints()
+  if guarded then
+    return
+  end
+  guarded = true
+  local default = vim.lsp.handlers["textDocument/inlayHint"]
+  vim.lsp.handlers["textDocument/inlayHint"] = function(err, result, ctx, cfg)
+    default(err, result, ctx, cfg)
+    local buf = ctx.bufnr
+    if not (buf and vim.api.nvim_buf_is_loaded(buf)) then
+      return
+    end
+    local ok, hints = pcall(vim.lsp.inlay_hint.get, { bufnr = buf })
+    if not ok then
+      return
+    end
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    for _, item in ipairs(hints) do
+      local position = item.inlay_hint.position
+      local line = lines[position.line + 1]
+      if line and position.character > #line then
+        position.character = #line
+      end
+    end
+  end
+end
+
 --- Starts (or reuses) the server for a Python buffer of a Gaanim project.
 ---@param buf integer
 ---@return integer? client_id
@@ -211,6 +246,7 @@ function M.attach(buf)
     vim.lsp.codelens.enable(true, { bufnr = buf })
   end
   if id and cfg.hints then
+    M.guard_hints()
     vim.lsp.inlay_hint.enable(true, { bufnr = buf })
   end
   local project = require("gaanim.project").load(root)
