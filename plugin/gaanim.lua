@@ -38,6 +38,9 @@ plug("gaanim-live", cmd("live"), "Gaanim: live mode (toggle)")
 plug("gaanim-loop", function()
   require("gaanim.preview").toggle_loop()
 end, "Gaanim: loop the slide under the cursor (toggle)")
+plug("gaanim-panel", function()
+  require("gaanim.panel").toggle()
+end, "Gaanim: playback panel (toggle)")
 plug("gaanim-nudge-up", function()
   require("gaanim.nudge").nudge(1)
 end, "Gaanim: increase the number under the cursor")
@@ -76,6 +79,23 @@ local function highlights()
   vim.api.nvim_set_hl(0, "GaanimPlayhead", { link = "DiagnosticInfo", default = true })
   vim.api.nvim_set_hl(0, "GaanimPlayheadText", { link = "Comment", default = true })
   vim.api.nvim_set_hl(0, "GaanimPlaying", { link = "LspReferenceText", default = true })
+  local panel = {
+    GaanimPanel = "NormalFloat",
+    GaanimPanelBorder = "FloatBorder",
+    GaanimPanelTitle = "Title",
+    GaanimPanelTime = "GaanimPlayhead",
+    GaanimPanelDim = "Comment",
+    GaanimPanelButton = "CursorLine",
+    GaanimPanelButtonOn = "PmenuSel",
+    GaanimPanelPlayed = "GaanimPlayhead",
+    GaanimPanelThumb = "GaanimPlayhead",
+    GaanimPanelTrack = "NonText",
+    GaanimPanelSegment = "CursorLine",
+    GaanimPanelSegmentOn = "Visual",
+  }
+  for name, link in pairs(panel) do
+    vim.api.nvim_set_hl(0, name, { link = link, default = true })
+  end
 end
 highlights()
 vim.api.nvim_create_autocmd("ColorScheme", { group = group, callback = highlights })

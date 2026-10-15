@@ -299,6 +299,18 @@ function M.get(c, opts)
     GaanimPlayhead = { fg = c.gold },
     GaanimPlayheadText = { fg = c.comment },
     GaanimPlaying = { bg = c.bg_visual },
+    GaanimPanel = { fg = c.fg, bg = c.bg_float },
+    GaanimPanelBorder = { fg = c.rule_strong, bg = c.bg_float },
+    GaanimPanelTitle = { fg = c.violet, bg = c.bg_float, bold = true },
+    GaanimPanelTime = { fg = c.gold, bg = c.bg_float, bold = true },
+    GaanimPanelDim = { fg = c.comment, bg = c.bg_float },
+    GaanimPanelButton = { fg = c.fg, bg = c.bg_change },
+    GaanimPanelButtonOn = { fg = c.ink, bg = c.bg_text, bold = true },
+    GaanimPanelPlayed = { fg = c.gold, bg = c.bg_float },
+    GaanimPanelThumb = { fg = c.gold_bright, bg = c.bg_float },
+    GaanimPanelTrack = { fg = c.rule, bg = c.bg_float },
+    GaanimPanelSegment = { fg = c.fg_dim, bg = c.bg_change },
+    GaanimPanelSegmentOn = { fg = c.ink, bg = c.bg_text, bold = true },
 
     -- Health
     healthError = { fg = c.red },
