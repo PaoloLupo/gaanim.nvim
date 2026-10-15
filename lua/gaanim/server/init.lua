@@ -192,9 +192,10 @@ local guarded = false
 --- text. This server answers at once, so after an edit that shortens a line
 --- basedpyright's hints land past its end and the decoration provider fails
 --- with "Invalid 'col': out of range". After each answer, every stored hint
---- is kept within its line until its own client answers again.
+--- is kept within its line until its own client answers again. Neovim 0.13
+--- draws each client's hints only at their own version, and needs none of it.
 function M.guard_hints()
-  if guarded then
+  if guarded or vim.fn.has("nvim-0.13") == 1 then
     return
   end
   guarded = true
