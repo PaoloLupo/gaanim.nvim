@@ -222,6 +222,40 @@ outline = { patterns = { { kind = "segment", pattern = '\nNAME%s*=%s*"([^"]+)"' 
 
 `:Gaanim timeline` needs none of this: it lists what the scene really made.
 
+## Colorscheme
+
+The plugin brings a colorscheme in Gaanim's colors: violet keywords, gold
+types and titles, mist borders, on warm paper or on graphite. The light
+variant is made for long sessions: no pure white, soft accents, and every
+text color at 4.5:1 (WCAG AA) or more on the background, the cursor line,
+floats and the selection (`tests/spec/theme_spec.lua` checks it).
+
+```
+:colorscheme gaanim          follows 'background'
+:colorscheme gaanim-light
+:colorscheme gaanim-dark
+```
+
+It covers the editor, Treesitter, LSP semantic tokens, diagnostics, inlay
+hints and code lenses, and LazyVim's plugins (blink.cmp, snacks, which-key,
+noice, trouble, gitsigns, flash, mini.icons, todo-comments, lazy, mason,
+grug-far, render-markdown). lualine's `auto` theme picks its own `gaanim`
+theme. With LazyVim, set `opts = { colorscheme = "gaanim-light" }` on
+`LazyVim/LazyVim`. Options, before the colorscheme loads:
+
+```lua
+require("gaanim.theme").setup({
+  transparent = false,             -- leave the backgrounds to the terminal
+  italic = true,                   -- comments, builtins, parameters
+  on_colors = function(colors, variant) end,
+  on_highlights = function(groups, colors, variant) end,
+})
+```
+
+`nvim --headless --clean -l scripts/theme_preview.lua [out.html]` renders
+both variants side by side: a scene with inlay hints, lenses and
+diagnostics, and the UI groups.
+
 ## Develop
 
 ```

@@ -13,6 +13,7 @@ CONTENTS                                                     *gaanim-contents*
   8. Typst math completion ..................... |gaanim-typst|
   9. Language server ........................... |gaanim-server|
  10. Live mode and nudges ...................... |gaanim-live|
+ 11. Colorscheme ............................... |gaanim-colorscheme|
 
 ==============================================================================
 1. INTRODUCTION                                                 *gaanim-intro*
@@ -399,5 +400,30 @@ it off.
 Like CTRL-A and CTRL-X, for decimals too: the number at or after the cursor
 moves by its own precision times the count (`0.8` → `0.9`, `0.25` → `0.26`,
 `3` → `4`). Outside Gaanim projects they are CTRL-A and CTRL-X.
+
+==============================================================================
+11. COLORSCHEME                                           *gaanim-colorscheme*
+
+`:colorscheme gaanim` follows 'background'; `gaanim-light` and `gaanim-dark`
+set it. The colors are Gaanim's: violet keywords, gold types and titles,
+mist borders, on warm paper or graphite. Every text color reads at 4.5:1
+(WCAG AA) or more on the background, the cursor line, floats and the
+selection; line numbers at 3:1. The groups cover the editor, Treesitter, LSP
+semantic tokens, diagnostics, |lsp-inlay_hint| (`LspInlayHint`), code
+lenses, the plugin's own groups and LazyVim's plugins. lualine's `auto`
+theme finds `lualine.themes.gaanim`.
+
+                                                        *gaanim.theme.setup()*
+Options go to `require("gaanim.theme").setup()` before the colorscheme
+loads: >lua
+    require("gaanim.theme").setup({
+      transparent = false,   -- no editor or float background
+      italic = true,         -- comments, builtins, parameters
+      on_colors = function(colors, variant) end,
+      on_highlights = function(groups, colors, variant) end,
+    })
+<
+`on_colors` changes the palette (`lua/gaanim/theme/palette.lua`) and
+`on_highlights` the groups before they are set.
 
  vim:tw=78:ts=8:ft=help:norl:
