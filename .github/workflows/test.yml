@@ -18,6 +18,7 @@ jobs:
         with:
           neovim: true
           version: ${{ matrix.nvim }}
+      - run: git clone --depth 1 https://github.com/PaoloLupo/volt ../volt
       - run: nvim --headless --clean -l tests/run.lua
 
   style:

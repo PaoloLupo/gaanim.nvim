@@ -18,6 +18,8 @@ local M = {}
 ---@field loop string The preview loops a range, and the lens that starts it
 ---@field unloop string The lens that ends a loop
 ---@field time string The instant of the cursor's line
+---@field previous string The panel's previous slide
+---@field next string The panel's next slide
 ---@field slides string A slides project
 ---@field video string A video project
 ---@field reloading string
@@ -39,6 +41,8 @@ M.sets = {
     loop = "󰑖", -- md-repeat
     unloop = "󰑗", -- md-repeat_off
     time = "󰔛", -- md-timer_outline
+    previous = "󰒮", -- md-skip_previous
+    next = "󰒭", -- md-skip_next
     slides = "󰐨", -- md-presentation
     video = "󰎁", -- md-movie
     reloading = "󰓦", -- md-sync
@@ -58,6 +62,8 @@ M.sets = {
     loop = "⟲",
     unloop = "⊘",
     time = "⏱",
+    previous = "⏮",
+    next = "⏭",
     slides = "▤",
     video = "▶",
     reloading = "↻",

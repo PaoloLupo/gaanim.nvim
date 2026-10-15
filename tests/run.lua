@@ -4,6 +4,11 @@ local here = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p")
 local root = vim.fs.normalize(vim.fs.dirname(vim.fs.dirname(here)))
 vim.opt.rtp:prepend(root)
 vim.cmd("runtime plugin/gaanim.lua")
+-- volt (PaoloLupo/volt) for the panel's specs: $VOLT, else beside this repo.
+local volt = vim.env.VOLT or vim.fs.joinpath(vim.fs.dirname(root), "volt")
+if vim.uv.fs_stat(vim.fs.joinpath(volt, "lua", "volt")) then
+  vim.opt.rtp:append(volt)
+end
 
 _G.FIXTURES = vim.fs.joinpath(root, "tests", "fixtures")
 

@@ -89,6 +89,20 @@ reads the CLI's text output.
                         whose `--listen` takes `loop` (|gaanim-caps|); in the
                         preview window, `L` does the same.
 
+:Gaanim panel                                                *:Gaanim-panel*
+                        Toggle a floating playback panel for the preview:
+                        the time, a scrubber that seeks where you click, the
+                        slides as blocks as long as they last (a click rests
+                        the preview at one), and buttons to go back a slide,
+                        play or pause, go forward a slide and loop the slide
+                        it rests on. In the panel: <Space> plays or pauses,
+                        `h` and `l` move a second, `[` and `]` a slide, `L`
+                        loops, `q` or <Esc> closes; <Tab> and <CR> reach the
+                        buttons from the keyboard. While the preview plays,
+                        the time runs on between its reports. Drawn with
+                        volt (https://github.com/PaoloLupo/volt, a fork of
+                        nvzone/volt with `ui.track`), which it needs.
+
 :Gaanim play                                                  *:Gaanim-play*
 :Gaanim pause                                                *:Gaanim-pause*
                         Play the preview from where it rests, or pause it.
@@ -176,6 +190,7 @@ No keys are mapped. Map these in normal mode:
   <Plug>(gaanim-follow)         <Plug>(gaanim-timeline)
   <Plug>(gaanim-play)           <Plug>(gaanim-pause)
   <Plug>(gaanim-live)           <Plug>(gaanim-loop)
+  <Plug>(gaanim-panel)
   <Plug>(gaanim-nudge-up)
   <Plug>(gaanim-nudge-down)
   <Plug>(gaanim-log)
