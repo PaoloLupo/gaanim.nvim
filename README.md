@@ -51,7 +51,10 @@ exports, presents, and keeps the narration script beside the code.
   `:Gaanim loop off` ends it. While it loops, the statusline and the signs
   in the code show `󰑖` instead of play, and the slide's lens turns into
   `󰑗 Unloop`. `:Gaanim seek {seconds|segment|stop}`,
-  `:Gaanim play` and `:Gaanim pause` drive it too. Where the preview rests is marked in the code
+  `:Gaanim play` and `:Gaanim pause` drive it too, and so does
+  `:Gaanim panel`: a floating panel with play, pause and loop, a scrubber
+  that seeks where you click, and the slides as blocks as long as they last,
+  each a click away (drawn with [volt](https://github.com/PaoloLupo/volt)). Where the preview rests is marked in the code
   with a sign, and the statusline shows it (`󰏤 0:01.8 Problem·question`).
 - **Errors where they happen.** A failed reload puts the Python error on its
   line as a diagnostic, without running anything else.
@@ -118,7 +121,8 @@ and the rest reads the CLI's text output.
 Needs Neovim 0.10+ (0.12 for native progress messages), a
 [Nerd Font](https://www.nerdfonts.com) for the default icons, and `gaanim` on
 `PATH`. [snacks.nvim](https://github.com/folke/snacks.nvim) is optional and
-gives the pickers a preview.
+gives the pickers a preview; [volt](https://github.com/PaoloLupo/volt) (a fork
+of nvzone/volt) is optional and draws `:Gaanim panel`.
 
 With lazy.nvim, loading on the command, the keys, or a Python or Markdown
 file:
@@ -126,6 +130,7 @@ file:
 ```lua
 {
   "PaoloLupo/gaanim.nvim",
+  dependencies = { { "PaoloLupo/volt", lazy = true } },
   cmd = "Gaanim",
   ft = { "python", "markdown" },
   opts = {
@@ -139,6 +144,7 @@ file:
     { "<leader>mf", "<Plug>(gaanim-follow)", desc = "Preview follows cursor" },
     { "<leader>mL", "<Plug>(gaanim-live)", desc = "Live mode" },
     { "<leader>mr", "<Plug>(gaanim-loop)", desc = "Loop slide (toggle)" },
+    { "<leader>mb", "<Plug>(gaanim-panel)", desc = "Playback panel" },
     { "<leader>mP", "<Plug>(gaanim-present-here)", desc = "Present from cursor" },
     { "<leader>mq", "<Plug>(gaanim-stop)", desc = "Close preview" },
     { "<leader>mc", "<Plug>(gaanim-check)", desc = "Check" },

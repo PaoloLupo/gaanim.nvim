@@ -134,6 +134,12 @@ M.subcommands = {
       return filter(names, arglead)
     end,
   },
+  panel = {
+    desc = "A playback panel for the preview: play, scrub, slides, loop (toggle)",
+    run = function()
+      require("gaanim.panel").toggle()
+    end,
+  },
   play = {
     desc = "Play the preview from where it rests",
     run = function()
