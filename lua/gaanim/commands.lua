@@ -13,10 +13,84 @@ local function filter(list, arglead)
   end, list)
 end
 
+--- The member paths of the current workspace, as last described (or now).
+---@param arglead string
+---@return string[]
+local function member_paths(arglead)
+  local workspace = require("gaanim.workspace").current(0, { quiet = true, cached = true })
+  local paths = {}
+  for _, member in ipairs(workspace and workspace.members or {}) do
+    table.insert(paths, member.path)
+  end
+  -- `--members` takes several, comma-separated.
+  local before, last = arglead:match("^(.*,)([^,]*)$")
+  return vim.tbl_map(function(path)
+    return (before or "") .. path
+  end, filter(paths, last or arglead))
+end
+
+local WORKSPACE = { "members", "use", "check", "export", "new", "info" }
+
+---@param args string[]
+local function workspace_command(args)
+  local ws_mod = require("gaanim.workspace")
+  local action = args[1] or "members"
+  local workspace = ws_mod.current(0)
+  if not workspace then
+    return
+  end
+  if action == "members" then
+    ws_mod.pick(workspace, {
+      actions = true,
+      on_choice = function(member)
+        ws_mod.open(workspace, member)
+      end,
+    })
+  elseif action == "use" then
+    local function use(member)
+      ws_mod.use(workspace.root, member.root)
+      require("gaanim.cli").notify(("Shared files of %s run as %s"):format(workspace.name, ws_mod.label(member)))
+    end
+    local member = args[2] and ws_mod.member(workspace, args[2])
+    if member and not member.error then
+      use(member)
+    elseif args[2] then
+      require("gaanim.cli").notify("No member " .. args[2] .. " in " .. workspace.name, vim.log.levels.ERROR)
+    else
+      ws_mod.pick(
+        workspace,
+        { title = "Shared files of " .. workspace.name .. " run as", valid = true, on_choice = use }
+      )
+    end
+  elseif action == "check" then
+    require("gaanim.check").workspace(workspace, args[2])
+  elseif action == "export" then
+    local preset, patterns = args[2], args[3]
+    if preset and not require("gaanim.config").get().export.presets[preset] then
+      -- `:Gaanim workspace export videos/*` picks the preset.
+      preset, patterns = nil, preset
+    end
+    require("gaanim.export").workspace(workspace, preset, patterns, vim.list_slice(args, 4))
+  elseif action == "new" then
+    local kind, name = args[2], args[3]
+    if kind and kind ~= "video" and kind ~= "slides" then
+      kind, name = nil, kind
+    end
+    require("gaanim.new").member(workspace, kind, name)
+  elseif action == "info" then
+    ws_mod.info()
+  else
+    require("gaanim.cli").notify(
+      "Usage: :Gaanim workspace [" .. table.concat(WORKSPACE, "|") .. "]",
+      vim.log.levels.WARN
+    )
+  end
+end
+
 ---@type table<string, gaanim.Subcommand>
 M.subcommands = {
   new = {
-    desc = "Create a project: new [slides|video] [name]",
+    desc = "Create a project or workspace: new [slides|video|workspace] [name]",
     run = function(args)
       require("gaanim.new").new(args[1], args[2])
     end,
@@ -25,9 +99,29 @@ M.subcommands = {
     end,
   },
   projects = {
-    desc = "Open one of your projects",
+    desc = "Open one of your projects or workspaces",
     run = function()
       require("gaanim.new").projects()
+    end,
+  },
+  workspace = {
+    desc = "The workspace: workspace [members|use|check|export|new|info]",
+    run = workspace_command,
+    complete = function(arglead, args)
+      if #args <= 1 then
+        return filter(WORKSPACE, arglead)
+      end
+      local action = args[1]
+      if (action == "use" or action == "check") and #args == 2 then
+        return member_paths(arglead)
+      elseif action == "export" and #args == 2 then
+        return filter(require("gaanim.export").preset_names(), arglead)
+      elseif action == "export" and #args == 3 then
+        return member_paths(arglead)
+      elseif action == "new" and #args == 2 then
+        return filter({ "video", "slides" }, arglead)
+      end
+      return {}
     end,
   },
   preview = {
@@ -286,7 +380,18 @@ function M.run(opts)
     vim.notify("Unknown :Gaanim subcommand: " .. name, vim.log.levels.ERROR, { title = "Gaanim" })
     return
   end
-  sub.run(args, opts)
+  -- A command run from a workspace's shared module may first ask which
+  -- member to run as; it then runs again with it.
+  local project = require("gaanim.project")
+  local previous = project.retry
+  project.retry = function()
+    sub.run(args, opts)
+  end
+  local ok, err = pcall(sub.run, args, opts)
+  project.retry = previous
+  if not ok then
+    error(err, 0)
+  end
 end
 
 ---@param arglead string

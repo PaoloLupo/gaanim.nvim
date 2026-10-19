@@ -25,19 +25,22 @@ M.calls = {
 
 --- Folders a relative name may resolve in, most likely first: the asset
 --- directory, the project's `assets_dir`, `assets/` beside the entry
---- script, the script's folder and the project root.
+--- script, the script's folder and the project root, then the shared asset
+--- folders of its workspace.
 ---@param project gaanim.Project
 ---@return string[]
 function M.bases(project)
   local entry_dir = vim.fs.dirname(project.entry)
   local list, seen = {}, {}
-  for _, dir in ipairs({
+  local dirs = {
     require("gaanim.script").base(project),
     project.assets_dir,
     vim.fs.joinpath(entry_dir, "assets"),
     entry_dir,
     project.root,
-  }) do
+  }
+  vim.list_extend(dirs, require("gaanim.workspace").shared_assets(project))
+  for _, dir in ipairs(dirs) do
     dir = vim.fs.normalize(dir)
     if not seen[dir] then
       seen[dir] = true
@@ -63,15 +66,37 @@ function M.resolve(project, name)
   end
 end
 
---- Files under the asset directory with one of `extensions`, as names
---- relative to it.
+--- Files under the asset directory, then under the workspace's shared
+--- asset folders, with one of `extensions`, as names relative to the folder
+--- they are in. A name the project has hides the shared file of that name.
 ---@param project gaanim.Project
 ---@param extensions string[]|false
----@return { name: string, path: string, size: integer }[]
+---@return { name: string, path: string, size: integer, shared?: boolean }[]
 function M.files(project, extensions)
   local base = vim.fs.normalize(project.assets_dir)
   if not vim.uv.fs_stat(base) then
     base = vim.fs.dirname(project.entry)
+  end
+  local files, seen = {}, {}
+  for _, folder in ipairs(vim.list_extend({ base }, require("gaanim.workspace").shared_assets(project))) do
+    for _, file in ipairs(M.files_in(folder, extensions)) do
+      if not seen[file.name] then
+        seen[file.name] = true
+        file.shared = folder ~= base or nil
+        table.insert(files, file)
+      end
+    end
+  end
+  return files
+end
+
+--- Files under `base` with one of `extensions`, by name relative to it.
+---@param base string
+---@param extensions string[]|false
+---@return { name: string, path: string, size: integer }[]
+function M.files_in(base, extensions)
+  if not vim.uv.fs_stat(base) then
+    return {}
   end
   local wanted = {}
   for _, ext in ipairs(extensions or {}) do
@@ -134,6 +159,18 @@ function M.references(buf)
   return refs
 end
 
+--- Where names are looked up, for messages: the project's assets folder,
+--- and its workspace's shared ones.
+---@param project gaanim.Project
+---@return string
+function M.where(project)
+  local folders = { vim.fn.fnamemodify(project.assets_dir, ":~:.") }
+  for _, folder in ipairs(require("gaanim.workspace").shared_assets(project)) do
+    table.insert(folders, vim.fn.fnamemodify(folder, ":~:."))
+  end
+  return table.concat(folders, " or ")
+end
+
 --- Warnings for names that resolve to no file.
 ---@param project gaanim.Project
 ---@param buf integer
@@ -149,11 +186,7 @@ function M.diagnostics(project, buf)
         },
         severity = vim.lsp.protocol.DiagnosticSeverity.Warning,
         source = "gaanim",
-        message = ("%s: no file named %q in %s"):format(
-          ref.call,
-          ref.name,
-          vim.fn.fnamemodify(project.assets_dir, ":~:.")
-        ),
+        message = ("%s: no file named %q in %s"):format(ref.call, ref.name, M.where(project)),
       })
     end
   end

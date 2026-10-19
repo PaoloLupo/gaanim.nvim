@@ -28,6 +28,7 @@ end
 
 plug("gaanim-new", cmd("new"), "Gaanim: new project")
 plug("gaanim-projects", cmd("projects"), "Gaanim: open a project")
+plug("gaanim-workspace", cmd("workspace"), "Gaanim: members of the workspace")
 plug("gaanim-preview", cmd("preview"), "Gaanim: live preview")
 plug("gaanim-preview-here", cmd("preview here"), "Gaanim: preview at the line under the cursor")
 plug("gaanim-follow", cmd("follow"), "Gaanim: preview follows the cursor (toggle)")
@@ -108,8 +109,18 @@ vim.api.nvim_create_autocmd("BufWritePost", {
   callback = function(args)
     local root = vim.fs.root(args.buf, "gaanim.toml")
     if root then
+      root = vim.fs.normalize(root)
+      local workspace = require("gaanim.workspace")
+      if vim.fs.basename(args.file) == "gaanim.toml" then
+        workspace.invalidate()
+      end
       if package.loaded["gaanim.inspect"] then
-        require("gaanim.inspect").invalidate(vim.fs.normalize(root))
+        -- Shared code of a workspace is part of every member's scene.
+        if workspace.is_root(root) then
+          require("gaanim.inspect").invalidate_below(root)
+        else
+          require("gaanim.inspect").invalidate(root)
+        end
       end
       require("gaanim.check").on_save(args.buf)
       if package.loaded["gaanim.server"] and args.file:match("%.py$") then
@@ -167,6 +178,16 @@ for _, buf in ipairs(vim.api.nvim_list_bufs()) do
   end
 end
 
+-- Entering a member's file makes it the member a workspace's shared modules
+-- run as, and fetches what `gaanim project` says of it in the background.
+vim.api.nvim_create_autocmd("BufEnter", {
+  group = group,
+  pattern = { "*.py", "*.md", "gaanim.toml" },
+  callback = function(args)
+    require("gaanim.workspace").on_enter(args.buf)
+  end,
+})
+
 local asset_timer = vim.uv.new_timer()
 vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave", "TextChanged" }, {
   group = group,
@@ -183,6 +204,18 @@ vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave", "TextChanged" }, {
         end
       end)
     end)
+  end,
+})
+
+-- Once a workspace is known, names found in its shared assets are no longer
+-- reported missing.
+vim.api.nvim_create_autocmd("User", {
+  group = group,
+  pattern = "GaanimWorkspace",
+  callback = function()
+    if package.loaded["gaanim.server"] then
+      require("gaanim.server.assets").publish(vim.api.nvim_get_current_buf())
+    end
   end,
 })
 

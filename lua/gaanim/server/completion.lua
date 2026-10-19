@@ -47,13 +47,13 @@ function M.complete(params, reply)
       kind = FILE,
       filterText = file.name,
       textEdit = { range = range, newText = file.name },
-      labelDetails = { description = assets.size(file.size) },
+      labelDetails = { description = assets.size(file.size) .. (file.shared and " · shared" or "") },
       documentation = { kind = "markdown", value = ("`%s`"):format(vim.fn.fnamemodify(file.path, ":~:.")) },
     })
   end
   if #items == 0 then
     table.insert(items, {
-      label = "(no matching files in " .. vim.fn.fnamemodify(project.assets_dir, ":t") .. "/)",
+      label = "(no matching files in " .. assets.where(project) .. ")",
       kind = FOLDER,
       textEdit = { range = range, newText = ctx.content },
     })

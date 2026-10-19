@@ -9,7 +9,7 @@ local M = {}
 ---@field target string What the CLI receives: the folder, or the lone script
 ---@field manifest? string Path of gaanim.toml
 ---@field name string
----@field kind "video"|"slides"|"script"
+---@field kind "video"|"slides"|"script"|"workspace" "workspace" only in `list`
 ---@field entry string Entry script, absolute
 ---@field assets_dir string Absolute
 ---@field output_dir string Absolute
@@ -64,11 +64,15 @@ local function is_gaanim_script(path)
   return head:match("from%s+gaanim") ~= nil or head:match("import%s+gaanim") ~= nil
 end
 
---- Builds the project for a gaanim.toml folder.
+--- Builds the project for a gaanim.toml folder; nil for a workspace's own
+--- manifest, which names no project (see |gaanim.workspace|).
 ---@param root string
 ---@return gaanim.Project?
 function M.load(root)
   root = vim.fs.normalize(root)
+  if require("gaanim.workspace").is_root(root) then
+    return nil
+  end
   local manifest = vim.fs.joinpath(root, "gaanim.toml")
   local raw = M.read_toml(manifest)
   if not raw then
@@ -89,44 +93,114 @@ function M.load(root)
   }
 end
 
+--- A Python file that imports gaanim, as a project of its own.
+---@param name string
+---@return gaanim.Project
+function M.script(name)
+  name = vim.fs.normalize(name)
+  local dir = vim.fs.dirname(name)
+  return {
+    root = dir,
+    target = name,
+    name = vim.fn.fnamemodify(name, ":t:r"),
+    kind = "script",
+    entry = name,
+    assets_dir = vim.fs.joinpath(dir, "assets"),
+    output_dir = dir,
+    raw = {},
+  }
+end
+
+--- What a file in a workspace's own folders acts as: a script that imports
+--- gaanim outside the shared Python folders is a project of its own (a
+--- sketch); anything else, a shared module above all, runs as part of the
+--- workspace's active member.
+---@param root string Workspace root
+---@param file string "" for none
+---@return gaanim.Project?
+function M.in_workspace(root, file)
+  local workspace = require("gaanim.workspace")
+  if file ~= "" and not workspace.is_shared(root, file) and is_gaanim_script(file) then
+    return M.script(file)
+  end
+  local member = workspace.active[vim.fs.normalize(root)]
+  return member and M.load(member) or nil
+end
+
 --- The project of a buffer, or of the current directory. A Python file that
---- imports gaanim outside any project counts as a project of its own.
+--- imports gaanim outside any project counts as a project of its own. In a
+--- workspace's own folders, see `in_workspace`.
 ---@param buf? integer
 ---@return gaanim.Project?
 function M.current(buf)
   buf = buf or 0
+  local name = vim.api.nvim_buf_get_name(buf)
+  name = name ~= "" and vim.fs.normalize(name) or ""
   local root = vim.fs.root(buf, "gaanim.toml")
   if root then
-    return M.load(root)
+    return M.load(root) or M.in_workspace(root, name)
   end
-  local name = vim.api.nvim_buf_get_name(buf)
   if name ~= "" and is_gaanim_script(name) then
-    name = vim.fs.normalize(name)
-    local dir = vim.fs.dirname(name)
-    return {
-      root = dir,
-      target = name,
-      name = vim.fn.fnamemodify(name, ":t:r"),
-      kind = "script",
-      entry = name,
-      assets_dir = vim.fs.joinpath(dir, "assets"),
-      output_dir = dir,
-      raw = {},
-    }
+    return M.script(name)
   end
   root = vim.fs.root(vim.uv.cwd() or ".", "gaanim.toml")
-  return root and M.load(root) or nil
+  return root and (M.load(root) or M.in_workspace(root, "")) or nil
 end
 
---- Like `current`, but tells the user when there is no project.
+--- Runs again the `:Gaanim` command being run, once a member is picked.
+---@type fun()?
+M.retry = nil
+
+--- Like `current`, but tells the user when there is no project. In a
+--- workspace's own file with no active member yet, it takes the only
+--- member, or asks which one and runs the command again with it.
 ---@param buf? integer
 ---@return gaanim.Project?
 function M.require(buf)
   local project = M.current(buf)
-  if not project then
-    vim.notify("No Gaanim project here (no gaanim.toml above this file)", vim.log.levels.WARN, { title = "Gaanim" })
+  if project then
+    return project
   end
-  return project
+  local root = vim.fs.root(buf or 0, "gaanim.toml")
+  if root and require("gaanim.workspace").is_root(vim.fs.normalize(root)) then
+    return require("gaanim.workspace").choose(vim.fs.normalize(root), M.retry)
+  end
+  vim.notify("No Gaanim project here (no gaanim.toml above this file)", vim.log.levels.WARN, { title = "Gaanim" })
+  return nil
+end
+
+--- The root of the project a buffer's commands act on, cheaply enough for
+--- autocommands and statuslines: its project's; in a workspace's own
+--- folders the active member's, or a sketch's folder; false outside.
+---@param buf integer
+---@return string|false
+function M.root_of(buf)
+  local root = vim.b[buf].gaanim_root
+  if root == nil then
+    root = vim.fs.root(buf, "gaanim.toml")
+    root = root and vim.fs.normalize(root) or false
+    vim.b[buf].gaanim_root = root
+  end
+  if not root then
+    return false
+  end
+  local workspace = require("gaanim.workspace")
+  if not workspace.is_root(root) then
+    return root
+  end
+  local name = vim.api.nvim_buf_get_name(buf)
+  if name ~= "" then
+    name = vim.fs.normalize(name)
+    local script = vim.b[buf].gaanim_script
+    if script == nil then
+      script = is_gaanim_script(name)
+      vim.b[buf].gaanim_script = script
+    end
+    if script and not workspace.is_shared(root, name) then
+      return vim.fs.dirname(name)
+    end
+  end
+  return workspace.active[root] or false
 end
 
 ---@return string?
@@ -135,7 +209,9 @@ function M.projects_dir()
   return dir and vim.fs.normalize(vim.fn.expand(dir)) or nil
 end
 
---- Projects under `projects_dir`, up to three levels deep, newest first.
+--- Projects and workspaces under `projects_dir`, up to three levels deep,
+--- newest first. A workspace is one entry (of kind "workspace", its entry
+--- its manifest) that stands for its members.
 ---@return gaanim.Project[]
 function M.list()
   local dir = M.projects_dir()
@@ -146,7 +222,8 @@ function M.list()
   for _, name in ipairs(config.get().outline.ignore) do
     ignore[name] = true
   end
-  local found = {}
+  local workspace = require("gaanim.workspace")
+  local found, workspaces = {}, {}
   for path, kind in
     vim.fs.dir(dir, {
       depth = 3,
@@ -157,14 +234,42 @@ function M.list()
     })
   do
     if kind == "file" and vim.fs.basename(path) == "gaanim.toml" then
-      local project = M.load(vim.fs.joinpath(dir, vim.fs.dirname(path)))
-      if project then
-        local stat = vim.uv.fs_stat(project.entry) or vim.uv.fs_stat(project.manifest)
-        project.raw._mtime = stat and stat.mtime.sec or 0
-        table.insert(found, project)
+      local root = vim.fs.normalize(vim.fs.joinpath(dir, vim.fs.dirname(path)))
+      local manifest = vim.fs.joinpath(root, "gaanim.toml")
+      local entry
+      if workspace.is_root(root) then
+        local info = workspace.manifest(root) or {}
+        entry = {
+          root = root,
+          target = root,
+          manifest = manifest,
+          name = info.name or vim.fs.basename(root),
+          kind = "workspace",
+          entry = manifest,
+          assets_dir = vim.fs.joinpath(root, "assets"),
+          output_dir = vim.fs.joinpath(root, "exports"),
+          raw = {},
+        }
+        table.insert(workspaces, root)
+      else
+        entry = M.load(root)
+      end
+      if entry then
+        local stat = vim.uv.fs_stat(entry.entry) or vim.uv.fs_stat(manifest)
+        entry.raw._mtime = stat and stat.mtime.sec or 0
+        table.insert(found, entry)
       end
     end
   end
+  -- A workspace's members are reached through it.
+  found = vim.tbl_filter(function(entry)
+    for _, root in ipairs(workspaces) do
+      if entry.root ~= root and workspace.within(entry.root, root) then
+        return false
+      end
+    end
+    return true
+  end, found)
   table.sort(found, function(a, b)
     return a.raw._mtime > b.raw._mtime
   end)

@@ -19,15 +19,15 @@ end
 describe("caps", function()
   it("reads what a help text offers", function()
     local new = caps.parse(
-      "COMMANDS\n  inspect <SCRIPT_OR_PROJECT> [--json]  List segments\nPREVIEW OPTIONS\n  --listen <stdio|HOST:PORT>  Let an editor\n  --message-format <FORMAT>   human or json",
+      "COMMANDS\n  inspect <SCRIPT_OR_PROJECT> [--json]  List segments\n  project [PATH] [--json]  Describe the project\nPREVIEW OPTIONS\n  --listen <stdio|HOST:PORT>  Let an editor\n  --message-format <FORMAT>   human or json",
       "  --frame <SECONDS|NAME>[,...]  Write exactly one PNG"
     )
-    eq({ listen = true, json = true, inspect = true, names = true }, new)
+    eq({ listen = true, json = true, inspect = true, names = true, project = true }, new)
     local old = caps.parse(
       "COMMANDS\n  init <video|slides> [DIR]\n  check <SCRIPT_OR_PROJECT>\nPREVIEW OPTIONS\n  --present  Present fullscreen, with a presenter window (the inspector)",
       "  --frame <SECONDS|MARKER>[,...]  Write exactly one PNG"
     )
-    eq({ listen = false, json = false, inspect = false, names = false }, old)
+    eq({ listen = false, json = false, inspect = false, names = false, project = false }, old)
   end)
 end)
 

@@ -14,14 +14,17 @@ CONTENTS                                                     *gaanim-contents*
   9. Language server ........................... |gaanim-server|
  10. Live mode and nudges ...................... |gaanim-live|
  11. Colorscheme ............................... |gaanim-colorscheme|
+ 12. Workspaces ................................ |gaanim-workspace|
 
 ==============================================================================
 1. INTRODUCTION                                                 *gaanim-intro*
 
 gaanim.nvim drives the `gaanim` command from Neovim. A project is a folder
 with a `gaanim.toml`; a Python file that imports gaanim outside any project is
-a project of its own. The plugin needs no |setup()|: |:Gaanim| and the
-|<Plug>| mappings exist once it is on 'runtimepath'.
+a project of its own. Several projects can share code, assets and one Python
+environment in a workspace (|gaanim-workspace|). The plugin needs no
+|setup()|: |:Gaanim| and the |<Plug>| mappings exist once it is on
+'runtimepath'.
 
 Requirements: Neovim 0.10+ (0.12 shows exports as progress messages), a
 Nerd Font for the default icons (see `icons` in |gaanim-config|) and `gaanim`
@@ -38,6 +41,9 @@ offers:
   `inspect`             |:Gaanim-timeline|, the instant of the cursor's line,
                       stills at the cursor
   names in `export`     stills and ranges of the slide under the cursor
+  `project`             workspaces (|gaanim-workspace|): the shared `.venv`
+                      and `sys.path` for completion, members, checking and
+                      exporting them all
 While a preview with `--listen` is open, each `ready` carries the scene's
 timeline (the object `inspect --json` prints): the plugin takes it, and after
 a save waits for it instead of running the scene again through `inspect`.
@@ -50,15 +56,51 @@ reads the CLI's text output.
                                                                      *:Gaanim*
 :Gaanim                 Pick a subcommand.
 
-:Gaanim new [slides|video] [name]                              *:Gaanim-new*
+:Gaanim new [slides|video|workspace] [name]                    *:Gaanim-new*
                         Create a project with `gaanim init` in
                         `projects_dir` (or the current directory), with its
                         Python environment, and open its entry script. A
                         name with a path separator is used as a path.
+                        `workspace` creates a workspace with `gaanim init
+                        workspace` and opens its first member. Inside a
+                        workspace, a video or slides project becomes a
+                        member of it (|:Gaanim-workspace| `new`); a name
+                        starting with `.` or absolute stays a path.
 
 :Gaanim projects                                          *:Gaanim-projects*
                         Pick one of the projects in `projects_dir` and open
-                        it.
+                        it. A workspace is one entry, which opens one of its
+                        members.
+
+:Gaanim workspace [{action}]                             *:Gaanim-workspace*
+                        The workspace of the current file. Actions:
+                        `members`   (the default) pick a member and open
+                                    it; invalid ones show in red with their
+                                    error. The list ends with New video, New
+                                    presentation, Check all and Export all.
+                        `use [{member}]`
+                                    make {member} (a path such as
+                                    `videos/intro`) the one shared modules
+                                    run as, or pick it.
+                        `check [{members}]`
+                                    check every member, or those {members}
+                                    names (paths or patterns as in
+                                    `members`, comma-separated), in one
+                                    `gaanim check`. Each member's problems
+                                    become its diagnostics, all of them one
+                                    quickfix list.
+                        `export [{preset}] [{members}]`
+                                    export each member, in a process of its
+                                    own, to `workspace.output` under the
+                                    workspace (`exports/{member}.mp4`: the
+                                    files repeat its layout).
+                        `new [video|slides] [{name}]`
+                                    add a member beside the others of its
+                                    kind (a name with `/` is a path from the
+                                    workspace) and open it.
+                        `info`      what the file belongs to: the members,
+                                    the shared folders, the interpreter and
+                                    `sys.path`.
 
 :Gaanim preview [here|only]                                *:Gaanim-preview*
                         Open the live preview. It reloads when a project
@@ -180,6 +222,7 @@ reads the CLI's text output.
 No keys are mapped. Map these in normal mode:
 
   <Plug>(gaanim-new)            <Plug>(gaanim-projects)
+  <Plug>(gaanim-workspace)
   <Plug>(gaanim-preview)        <Plug>(gaanim-preview-here)
   <Plug>(gaanim-preview-only)   <Plug>(gaanim-present)
   <Plug>(gaanim-present-here)   <Plug>(gaanim-stop)
@@ -283,6 +326,10 @@ plugin loads. Defaults:
                               -- a table overriding some: { segment = "▤" }
     lsp = true,               -- point pyright/basedpyright at the
                               -- project's .venv, where the stubs are
+    workspace = {             -- |gaanim-workspace|
+      output = "exports/{member}", -- where `workspace export` writes,
+                              -- from the workspace's root
+    },
   }
 <
 `outline.patterns` adds Lua patterns whose first capture is a name, for
@@ -310,10 +357,17 @@ Show it only once the plugin has loaded, so the statusline does not load
 it: `cond = function() return vim.g.loaded_gaanim == true end`.
 
                 *GaanimCheck* *GaanimPreview* *GaanimPlayhead* *GaanimInspect*
+                                             *GaanimWorkspace* *GaanimMember*
 |User| events: `GaanimCheck` after each check, with `data.report`;
 `GaanimPreview` when the preview's state changes, with `data.root`;
 `GaanimPlayhead` when it moves, with `data.playhead` ({time}, {segment},
-{stop}, {playing}); `GaanimInspect` when `gaanim inspect` returns.
+{stop}, {playing}); `GaanimInspect` when `gaanim inspect` returns;
+`GaanimWorkspace` when `gaanim project` answers, with `data.path`;
+`GaanimMember` when a workspace's active member changes, with
+`data.workspace` and `data.root`.
+
+In a workspace's shared module the statusline shows the active member's
+preview and check.
 
 Highlights: `GaanimPlayhead` (the sign) and `GaanimPlayheadText` (the text
 after the line), linked to `DiagnosticInfo` and `Comment`.
@@ -440,5 +494,54 @@ loads: >lua
 <
 `on_colors` changes the palette (`lua/gaanim/theme/palette.lua`) and
 `on_highlights` the groups before they are set.
+
+==============================================================================
+12. WORKSPACES                                              *gaanim-workspace*
+
+A workspace is several Gaanim projects in one repository that share Python
+code, assets and one Python environment. A `[workspace]` table in the root
+`gaanim.toml` lists its members; `[workspace.shared]` names the shared
+folders (`src` and `assets` by default, when they exist):
+>toml
+  [workspace]
+  members = [{ path = "season-1/*", group = "Season 1" }, "trailer"]
+
+  [workspace.shared]
+  python = ["common"]
+<
+The plugin asks `gaanim project <file> --json` (|gaanim-caps|), in the
+background and without running Python, what each file belongs to: its
+project, its workspace and members, the folders its scripts find on
+`sys.path` and the interpreter. It keeps the answers until a `gaanim.toml`
+is written.
+
+Completion ~
+pyright and basedpyright get the interpreter of the workspace's `.venv` (or
+the member's own, when it has one) as `python.pythonPath`, and the folders
+of `sys.path` added to `analysis.extraPaths` (`basedpyright.analysis` for
+basedpyright), after the ones already there: the shared Python, the
+member's `src/` and folder, the workspace root. Folders only get added, so
+one client serves every member opened.
+
+Active member ~
+The workspace's own files, a shared module above all, run as part of a
+member: the one whose files were entered last. From a shared module,
+|:Gaanim-preview|, |:Gaanim-check|, |:Gaanim-live|, |:Gaanim-follow| and
+the times in the code work with that member; saving one marks every
+member's timeline stale, as the module is part of each scene. With no
+member entered yet, a command takes the only member, or asks which one and
+runs again with it; `:Gaanim workspace use` changes it. A script that
+imports gaanim outside the shared Python folders (a sketch at the root) is
+a project of its own.
+
+Assets ~
+Names that are not in the member's folders are looked up in the shared
+asset folders, as Gaanim does: completion offers them (marked `shared`) and
+they are not reported missing.
+
+Members ~
+|:Gaanim-workspace| lists, checks, exports and adds members. A member whose
+`gaanim.toml` is invalid shows in red with its error, and checking the
+workspace reports it on its manifest.
 
  vim:tw=78:ts=8:ft=help:norl:
