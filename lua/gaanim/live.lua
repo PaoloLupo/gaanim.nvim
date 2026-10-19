@@ -17,15 +17,12 @@ M.enabled = {}
 ---@type table<integer, uv.uv_timer_t>
 local timers = {}
 
+--- The project a change in the buffer reaches: a shared module of a
+--- workspace reaches the member it runs as.
 ---@param buf integer
 ---@return string|false
 local function root_of(buf)
-  local root = vim.b[buf].gaanim_root
-  if root == nil then
-    root = vim.fs.root(buf, "gaanim.toml") or false
-    vim.b[buf].gaanim_root = root
-  end
-  return root and vim.fs.normalize(root) or false
+  return require("gaanim.project").root_of(buf)
 end
 
 ---@param root string

@@ -613,11 +613,7 @@ function M.on_cursor(now)
   if vim.bo[buf].filetype ~= "python" then
     return
   end
-  local root = vim.b[buf].gaanim_root
-  if root == nil then
-    root = vim.fs.root(buf, "gaanim.toml") or false
-    vim.b[buf].gaanim_root = root
-  end
+  local root = project_mod.root_of(buf)
   if not (root and M.following[root]) then
     return
   end

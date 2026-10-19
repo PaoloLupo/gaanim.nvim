@@ -43,6 +43,11 @@ function M.check()
     feature(can.json, "--message-format json", "exact lines for diagnostics, export percent")
     feature(can.inspect, "inspect", "timeline with times, the instant of each line")
     feature(can.names, "export by name", "stills and ranges of the slide under the cursor")
+    feature(
+      can.project,
+      "project",
+      "workspaces: the shared .venv and src/ for completion, members, check and export of them all"
+    )
   end
 
   for _, tool in ipairs({ "ffmpeg", "ffprobe" }) do
@@ -77,6 +82,8 @@ function M.check()
     'Gaanim\'s "Open in the editor" reaches this Neovim at ' .. (server ~= "" and server or "(no server yet)")
   )
 
+  M.workspace()
+
   health.start("gaanim.nvim: current project")
   local project = require("gaanim.project").current()
   if not project then
@@ -87,14 +94,21 @@ function M.check()
   if not vim.uv.fs_stat(project.entry) then
     health.error("Entry script missing: " .. project.entry)
   end
-  local venv = vim.fs.joinpath(project.root, ".venv")
-  if vim.uv.fs_stat(venv) then
-    health.ok(".venv found: Python language servers get pointed at it for completion")
+  local described = exe ~= ""
+    and require("gaanim.caps").get().project
+    and require("gaanim.workspace").describe(project.entry)
+  local interpreter = described and described.python.interpreter
+    or require("gaanim.lsp").fallback(project.root).interpreter
+  if interpreter then
+    health.ok("Python environment: " .. interpreter .. " (Python language servers get pointed at it)")
   elseif project.kind ~= "script" then
     health.warn(
-      "No .venv in the project",
+      "No .venv for the project (nor its workspace)",
       { "Open the project with gaanim once, or run `gaanim init <kind> . --force`" }
     )
+  end
+  if described and #described.python.paths > 0 then
+    health.info("sys.path: " .. table.concat(described.python.paths, ", "))
   end
   local docs = require("gaanim.docs").dir()
   if docs then
@@ -104,6 +118,49 @@ function M.check()
   end
   local path, exists = require("gaanim.script").path(project)
   health.info(("Narration script: %s%s"):format(path or "?", exists and "" or " (not created yet)"))
+end
+
+--- The workspace around the current buffer: its members, any invalid one,
+--- the shared folders and which member its shared modules run as.
+function M.workspace()
+  local health = vim.health
+  local ws = require("gaanim.workspace")
+  local name = vim.api.nvim_buf_get_name(0)
+  local root = vim.fs.root(name ~= "" and name or (vim.uv.cwd() or "."), "gaanim.toml")
+  root = root and vim.fs.normalize(root)
+  local above = root and (ws.is_root(root) and root or ws.root_above(vim.fs.dirname(root)))
+  if not above then
+    return
+  end
+  health.start("gaanim.nvim: workspace")
+  if not (require("gaanim.cli").available() and require("gaanim.caps").get().project) then
+    health.warn("This gaanim cannot describe workspaces", { "`gaanim update` brings `gaanim project`" })
+    return
+  end
+  local workspace = ws.current(0, { quiet = true })
+  if not workspace then
+    local _, err = ws.describe(above)
+    health.error(err or ("Could not read the workspace in " .. above))
+    return
+  end
+  local invalid = vim.tbl_filter(function(member)
+    return member.error ~= nil
+  end, workspace.members)
+  health.ok(("%s · %d members · %s"):format(workspace.name, #workspace.members, workspace.root))
+  for _, member in ipairs(invalid) do
+    health.error(member.path .. ": " .. member.error)
+  end
+  if #workspace.members == 0 then
+    health.warn("No members yet", { "`:Gaanim workspace new`, or list their folders in `members`" })
+  end
+  health.info("Shared Python: " .. (#workspace.python > 0 and table.concat(workspace.python, ", ") or "none"))
+  health.info("Shared assets: " .. (#workspace.assets > 0 and table.concat(workspace.assets, ", ") or "none"))
+  local active = ws.active[vim.fs.normalize(workspace.root)]
+  local member = active and ws.member(workspace, active)
+  health.info(
+    member and ("Shared modules run as " .. ws.label(member))
+      or "No active member yet: shared modules run as the member whose files you enter"
+  )
 end
 
 return M

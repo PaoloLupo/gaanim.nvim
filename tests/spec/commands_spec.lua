@@ -11,7 +11,10 @@ describe("commands", function()
 
   it("completes the arguments of a subcommand", function()
     eq({ "here", "only" }, commands.complete("", "Gaanim preview "))
-    eq({ "slides", "video" }, commands.complete("", "Gaanim new "))
+    eq({ "slides", "video", "workspace" }, commands.complete("", "Gaanim new "))
+    eq({ "export" }, commands.complete("e", "Gaanim workspace e"))
+    eq({ "video", "slides" }, commands.complete("", "Gaanim workspace new "))
+    eq({ "draft" }, commands.complete("dr", "Gaanim workspace export dr"))
     eq({ "draft" }, commands.complete("dr", "Gaanim export dr"))
   end)
 

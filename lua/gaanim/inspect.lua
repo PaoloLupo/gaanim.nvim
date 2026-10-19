@@ -182,6 +182,18 @@ function M.invalidate(root)
   end
 end
 
+--- Marks stale the timeline of every project in a folder: a workspace's
+--- shared code is part of each member's scene.
+---@param folder string
+function M.invalidate_below(folder)
+  local workspace = require("gaanim.workspace")
+  for root, entry in pairs(M.cache) do
+    if workspace.within(root, folder) then
+      entry.stale = true
+    end
+  end
+end
+
 --- Every line that stands for an instant, by the rules of the preview's
 --- `follow`: a segment rests at its first stop (else its end), a stop and a
 --- marker at their time, a voiceover at its start and a `play` at its end.

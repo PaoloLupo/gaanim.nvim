@@ -172,6 +172,142 @@ function M.export(target, extra)
   run(project, default_output(project, target, preset, frame), args)
 end
 
+--- The `--output` of a workspace export: `workspace.output` under its root
+--- (`{member}` is each member's path), with the preset's suffix and
+--- extension, as `default_output` names a project's.
+---@param workspace gaanim.Workspace
+---@param name string Preset name
+---@param preset gaanim.ExportPreset
+---@param frame? string
+---@return string
+function M.workspace_output(workspace, name, preset, frame)
+  local pattern = config.get().workspace.output
+  if not pattern:find("{member}", 1, true) then
+    pattern = pattern .. "/{member}"
+  end
+  local suffix = ""
+  if name == "draft" or name == "notes" then
+    suffix = "-" .. name
+  elseif frame then
+    suffix = "-" .. frame:gsub("[^%w%._-]", "_")
+  end
+  local output = pattern .. suffix .. "." .. preset.ext
+  if not (output:match("^%a:[/\\]") or output:match("^/")) then
+    output = vim.fs.joinpath(workspace.root, output)
+  end
+  return vim.fs.normalize(output)
+end
+
+--- Exports every member of a workspace (or those `patterns` names, as
+--- `--members` takes them) with a preset, each in a `gaanim export` of its
+--- own: `{member}` in the output becomes each member's path, so the files
+--- repeat the workspace's layout.
+---@param workspace gaanim.Workspace
+---@param target? string Preset name
+---@param patterns? string
+---@param extra? string[]
+function M.workspace(workspace, target, patterns, extra)
+  extra = extra or {}
+  local presets = config.get().export.presets
+  if not target then
+    local items = vim.tbl_map(function(name)
+      return { text = name, hint = presets[name].desc .. "  ." .. presets[name].ext, value = name }
+    end, M.preset_names())
+    ui.pick(items, {
+      title = "Export the members of " .. workspace.name,
+      on_choice = function(item)
+        M.workspace(workspace, item.value, patterns, extra)
+      end,
+    })
+    return
+  end
+  local preset = presets[target]
+  if not preset then
+    cli.notify("Unknown export preset: " .. target, vim.log.levels.ERROR)
+    return
+  end
+  local args = vim.list_extend(vim.deepcopy(preset.args or {}), extra)
+  local frame
+  for i, arg in ipairs(args) do
+    if arg == "--frame" then
+      frame = args[i + 1]
+    end
+  end
+  if preset.ask == "frame" and not frame then
+    -- Markers differ between members: a time, or a name each one has.
+    ui.input("Time in seconds or marker of every member: ", nil, function(value)
+      M.workspace(workspace, target, patterns, vim.list_extend(vim.deepcopy(extra), { "--frame", value }))
+    end)
+    return
+  end
+  local output = M.workspace_output(workspace, target, preset, frame)
+  local members = vim.tbl_filter(function(member)
+    return not member.error
+  end, require("gaanim.workspace").select(workspace, patterns))
+  if #members == 0 then
+    cli.notify("No member to export in " .. workspace.name, vim.log.levels.WARN)
+    return
+  end
+  for _, member in ipairs(members) do
+    vim.fn.mkdir(vim.fs.dirname((output:gsub("{member}", member.path))), "p")
+  end
+  local cmd = { "export", workspace.root, "--output", output }
+  if patterns and patterns ~= "" then
+    vim.list_extend(cmd, { "--members", patterns })
+  end
+  vim.list_extend(cmd, args)
+  vim.list_extend(cmd, { "--message-format", "json" })
+  local progress = ui.progress("Gaanim export · " .. workspace.name)
+  local total, index, current = #members, 0, nil
+  local errors = {}
+  progress.update(require("gaanim.workspace").count(total), 0)
+  cli.run(cmd, {
+    cwd = workspace.root,
+    key = "export:" .. workspace.root,
+    on_json = function(object)
+      if object.type == "message" and object.label == "export" and object.level == "info" then
+        local path = (object.message or ""):match("^(.-) · ")
+        if path and require("gaanim.workspace").member(workspace, path) then
+          index, current = index + 1, path
+          progress.update(("%s (%d/%d)"):format(path, index, total), math.floor((index - 1) / total * 100))
+        end
+      elseif object.type == "progress" and object.percent and current then
+        local overall = ((index - 1) + object.percent / 100) / total * 100
+        progress.update(("%s %d%% (%d/%d)"):format(current, object.percent, index, total), math.floor(overall))
+      elseif object.type == "message" and object.level == "error" then
+        table.insert(errors, (current and (current .. ": ") or "") .. (object.message or "failed"))
+      end
+    end,
+    on_exit = function(code, _, objects)
+      local summary
+      for _, object in ipairs(objects) do
+        if object.type == "workspace" then
+          summary = object
+        end
+      end
+      local where = vim.fn.fnamemodify(vim.fs.dirname((output:gsub("{member}.*$", "x"))), ":~:.")
+      if code == 0 then
+        local count = require("gaanim.workspace").count(summary and summary.passed or total)
+        progress.finish(true, ("exported %s to %s"):format(count, where))
+        if config.get().export.open then
+          vim.ui.open(vim.fs.dirname((output:gsub("{member}.*$", "x"))))
+        end
+        return
+      end
+      local text = summary
+          and ("exported %d of %s"):format(
+            summary.passed or 0,
+            require("gaanim.workspace").count(summary.members or total)
+          )
+        or "export failed"
+      if #errors > 0 then
+        text = text .. " · " .. errors[#errors]
+      end
+      progress.finish(false, text .. "; see :Gaanim log")
+    end,
+  })
+end
+
 ---@param seconds number
 ---@return string
 local function seconds_arg(seconds)
