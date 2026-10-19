@@ -263,17 +263,18 @@ describe("new members", function()
       },
       { type = "hint", message = 'Add it in C:\\ws\\gaanim.toml: members = [..., "shorts/one"]' },
       { type = "message", level = "success", label = "init", message = "Created video project" },
+      -- Paths as the system writes them.
       {
         type = "init",
         kind = "video",
-        root = "C:\\ws\\shorts\\one",
-        entry = "C:\\ws\\shorts\\one\\main.py",
-        workspace = "C:\\ws",
+        root = native("/ws/shorts/one"),
+        entry = native("/ws/shorts/one/main.py"),
+        workspace = native("/ws"),
         member = false,
       },
     })
-    eq("C:/ws/shorts/one/main.py", result.created.entry)
-    eq("C:/ws", result.created.workspace)
+    eq("/ws/shorts/one/main.py", result.created.entry)
+    eq("/ws", result.created.workspace)
     eq(false, result.created.member)
     eq(1, #result.warnings)
     assert(result.warnings[1]:find('members = [..., "shorts/one"]', 1, true), "the hint goes with its warning")
