@@ -51,24 +51,45 @@ local function explicit(name)
   return expanded:match("^[/\\]") ~= nil or expanded:match("^%a:[/\\]") ~= nil or expanded:match("^%.") ~= nil
 end
 
---- What `gaanim init` warned about, such as a folder `members` leaves out.
+---@class gaanim.InitResult
+---@field created? { kind: string, root: string, entry?: string, workspace?: string, member?: boolean, venv?: string } The `init` line of `--message-format json`
+---@field warnings string[] Each with the hint that follows it, such as the `members` line to add
+---@field error? string
+
+--- What `gaanim init` said: the JSON lines of `--message-format json`
+--- (the `init` line names what it created), else its text for people.
+--- Older versions put Windows' `\\?\` in front of paths.
 ---@param lines string[]
 ---@param objects table[]
----@return string[]
-local function warnings(lines, objects)
-  local found = {}
+---@return gaanim.InitResult
+function M.init_result(lines, objects)
+  local function plain(text)
+    return (tostring(text or ""):gsub("\\\\%?\\", ""))
+  end
+  ---@type gaanim.InitResult
+  local result = { warnings = {} }
   for _, line in ipairs(lines) do
     local text = line:match("^%s%s!%s+%S+%s+(.*)$")
     if text then
-      table.insert(found, (text:gsub("\\\\%?\\", "")))
+      table.insert(result.warnings, plain(text))
     end
   end
   for _, object in ipairs(objects) do
-    if object.type == "message" and object.level == "warning" then
-      table.insert(found, ((object.message or ""):gsub("\\\\%?\\", "")))
+    if object.type == "init" then
+      local created = vim.deepcopy(object)
+      for _, key in ipairs({ "root", "entry", "workspace", "venv", "manifest" }) do
+        created[key] = type(object[key]) == "string" and vim.fs.normalize(object[key]) or nil
+      end
+      result.created = created
+    elseif object.type == "message" and object.level == "warning" then
+      table.insert(result.warnings, plain(object.message))
+    elseif object.type == "hint" and #result.warnings > 0 then
+      result.warnings[#result.warnings] = result.warnings[#result.warnings] .. "\n" .. plain(object.message)
+    elseif object.type == "message" and object.level == "error" then
+      result.error = plain(object.message)
     end
   end
-  return found
+  return result
 end
 
 --- Creates a project with `gaanim init` and opens its entry script. Inside a
@@ -120,10 +141,11 @@ function M.new(kind, name)
   M.create(kind, resolve_dir(name))
 end
 
---- Runs `gaanim init <kind> <dir>` and opens what it made.
+--- Runs `gaanim init <kind> <dir>` and opens what it made, or hands it to
+--- `on_done` (with the `init` line, when this gaanim writes JSON).
 ---@param kind "slides"|"video"|"workspace"
 ---@param dir string
----@param on_done? fun()
+---@param on_done? fun(created?: table)
 function M.create(kind, dir, on_done)
   if vim.uv.fs_stat(vim.fs.joinpath(dir, "gaanim.toml")) then
     cli.notify(dir .. " is already a Gaanim " .. (kind == "workspace" and "workspace" or "project") .. "; opening it")
@@ -135,10 +157,15 @@ function M.create(kind, dir, on_done)
     kind == "workspace" and ("creating %s (Git repository and Python environment included)"):format(dir)
       or ("creating %s"):format(dir)
   )
-  cli.run({ "init", kind, dir }, {
+  local args = { "init", kind, dir }
+  if require("gaanim.caps").get().init then
+    vim.list_extend(args, { "--message-format", "json" })
+  end
+  cli.run(args, {
     on_exit = function(code, lines, objects)
+      local result = M.init_result(lines, objects)
       if code ~= 0 then
-        progress.finish(false, "gaanim init failed; see :Gaanim log")
+        progress.finish(false, (result.error or "gaanim init failed") .. "; see :Gaanim log")
         return
       end
       if
@@ -151,11 +178,11 @@ function M.create(kind, dir, on_done)
       end
       require("gaanim.workspace").invalidate()
       progress.finish(true, "created " .. dir)
-      for _, text in ipairs(warnings(lines, objects)) do
+      for _, text in ipairs(result.warnings) do
         cli.notify(text, vim.log.levels.WARN)
       end
       if on_done then
-        on_done()
+        on_done(result.created)
       else
         open(dir)
       end
@@ -247,15 +274,22 @@ function M.member(workspace, kind, name)
   end
   local dir = explicit(name) and resolve_dir(name)
     or vim.fs.normalize(vim.fs.joinpath(workspace.root, M.member_path(workspace, kind, name, active)))
-  M.create(kind, dir, function()
+  M.create(kind, dir, function(created)
     local project = project_mod.load(dir)
     if not project then
       return
     end
     local ws = require("gaanim.workspace")
-    local description = ws.describe(dir)
-    if description and description.workspace then
-      ws.use(description.workspace.root, project.root)
+    if created then
+      -- The `init` line says whether `members` lists it.
+      if created.member and created.workspace then
+        ws.use(created.workspace, project.root)
+      end
+    else
+      local description = ws.describe(dir)
+      if description and description.workspace then
+        ws.use(description.workspace.root, project.root)
+      end
     end
     project_mod.enter(workspace.root)
     vim.cmd.edit(vim.fn.fnameescape(project.entry))

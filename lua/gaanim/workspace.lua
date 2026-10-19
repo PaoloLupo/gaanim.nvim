@@ -315,15 +315,20 @@ end
 --- The description in a finished `gaanim project`, or why there is none.
 ---@param result vim.SystemCompleted
 ---@return gaanim.Description?, string?
-local function parse(result)
+function M.parse(result)
+  local ok, object = pcall(vim.json.decode, result.stdout or "", { luanil = { object = true, array = true } })
+  object = ok and type(object) == "table" and object or nil
   if result.code == 0 then
-    local ok, object = pcall(vim.json.decode, result.stdout or "", { luanil = { object = true, array = true } })
-    if ok and type(object) == "table" then
+    if object then
       local description = M.decode(object)
       M.remember(description)
       return description
     end
     return nil, "gaanim project printed no JSON"
+  end
+  -- Newer versions write the error as JSON too: {"path", "error"}.
+  if object and type(object.error) == "string" then
+    return nil, (object.error:gsub("\\\\%?\\", ""))
   end
   local text = vim.trim((result.stderr or "") .. "\n" .. (result.stdout or ""))
   text = text:match("✗%s+%S+%s+(.-)%s*$") or text
@@ -382,7 +387,7 @@ function M.describe(path, on_done)
       end
       local ok = pcall(vim.system, command(path), { text = true, env = { NO_COLOR = "1" } }, function(result)
         vim.schedule(function()
-          finish(running, parse(result))
+          finish(running, M.parse(result))
         end)
       end)
       if not ok then
@@ -399,7 +404,7 @@ function M.describe(path, on_done)
   end)
   local description, err
   if ok and result then
-    description, err = parse(result)
+    description, err = M.parse(result)
   else
     err = "could not run gaanim project"
   end

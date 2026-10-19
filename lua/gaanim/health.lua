@@ -48,6 +48,7 @@ function M.check()
       "project",
       "workspaces: the shared .venv and src/ for completion, members, check and export of them all"
     )
+    feature(can.init, "init JSON", "new members open as Gaanim made them; a folder `members` leaves out says so")
   end
 
   for _, tool in ipairs({ "ffmpeg", "ffprobe" }) do

@@ -507,8 +507,10 @@ folders (`src` and `assets` by default, when they exist):
   members = [{ path = "season-1/*", group = "Season 1" }, "trailer"]
 
   [workspace.shared]
-  python = ["common"]
+  python = ["code"]
 <
+`gaanim init workspace` (|:Gaanim-new| `workspace`) puts the shared package
+in `src/common/`, which every member imports as `from common import …`.
 The plugin asks `gaanim project <file> --json` (|gaanim-caps|), in the
 background and without running Python, what each file belongs to: its
 project, its workspace and members, the folders its scripts find on

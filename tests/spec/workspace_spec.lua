@@ -67,6 +67,20 @@ describe("gaanim project", function()
     eq(vim.fs.joinpath(root, ".venv", "Scripts", "python.exe"), description.python.interpreter)
   end)
 
+  it("takes an error from its JSON, and from older versions' text", function()
+    local _, err = workspace.parse({
+      code = 2,
+      stdout = vim.json.encode({
+        path = "C:\\ws\\a\\main.py",
+        error = "invalid project manifest C:\\ws\\a\\gaanim.toml",
+      }),
+      stderr = "",
+    })
+    eq("invalid project manifest C:\\ws\\a\\gaanim.toml", err)
+    _, err = workspace.parse({ code = 2, stdout = "", stderr = "  ✗ project   \\\\?\\C:\\x does not exist\n" })
+    eq("C:\\x does not exist", err)
+  end)
+
   it("selects members by path or pattern", function()
     local ws = described().workspace
     eq(
@@ -238,6 +252,38 @@ end)
 
 describe("new members", function()
   local new = require("gaanim.new")
+
+  it("read what gaanim init made from its JSON", function()
+    local result = new.init_result({}, {
+      {
+        type = "message",
+        level = "warning",
+        label = "init",
+        message = "C:\\ws\\shorts\\one is inside workspace channel, whose members do not include it",
+      },
+      { type = "hint", message = 'Add it in C:\\ws\\gaanim.toml: members = [..., "shorts/one"]' },
+      { type = "message", level = "success", label = "init", message = "Created video project" },
+      {
+        type = "init",
+        kind = "video",
+        root = "C:\\ws\\shorts\\one",
+        entry = "C:\\ws\\shorts\\one\\main.py",
+        workspace = "C:\\ws",
+        member = false,
+      },
+    })
+    eq("C:/ws/shorts/one/main.py", result.created.entry)
+    eq("C:/ws", result.created.workspace)
+    eq(false, result.created.member)
+    eq(1, #result.warnings)
+    assert(result.warnings[1]:find('members = [..., "shorts/one"]', 1, true), "the hint goes with its warning")
+  end)
+
+  it("read older versions' text", function()
+    local result = new.init_result({ "  ! init      \\\\?\\C:\\ws\\x is inside workspace channel" }, {})
+    eq(nil, result.created)
+    eq({ "C:\\ws\\x is inside workspace channel" }, result.warnings)
+  end)
 
   it("go beside the members of their kind", function()
     local ws = described().workspace

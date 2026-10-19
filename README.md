@@ -47,8 +47,9 @@ exports, presents, and keeps the narration script beside the code.
   `gaanim.toml`. The plugin asks `gaanim project --json` (`gaanim update`
   brings it), in the background, what each file belongs to:
   - pyright and basedpyright get the workspace's shared interpreter and the
-    folders on its `sys.path` (`analysis.extraPaths`), so `import` of the
-    shared `src/` and of the member's own modules completes;
+    folders on its `sys.path` (`analysis.extraPaths`), so `from common
+    import …` (the shared `src/common/`) and the member's own modules
+    complete;
   - a shared module (in `[workspace.shared] python`) runs as the *active
     member*, the one whose files you entered last: `:Gaanim preview`,
     `check`, `live`, `follow` and the times in the code work from it, and

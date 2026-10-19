@@ -15,6 +15,7 @@ local M = {}
 ---@field inspect boolean `gaanim inspect --json`
 ---@field names boolean `export --frame/--from/--to` take segment and stop names
 ---@field project boolean `gaanim project --json`, and with it workspaces
+---@field init boolean `gaanim init --message-format json`, `init workspace` in `--help`
 
 --- What a help text says the executable supports.
 ---@param general string Output of `gaanim --help`
@@ -27,10 +28,11 @@ function M.parse(general, export)
     inspect = general:match("\n%s+inspect%s") ~= nil,
     names = export:find("<SECONDS|NAME>", 1, true) ~= nil,
     project = general:match("\n%s+project%s") ~= nil,
+    init = general:find("init <video|slides|workspace>", 1, true) ~= nil,
   }
 end
 
-local NONE = { listen = false, json = false, inspect = false, names = false, project = false }
+local NONE = { listen = false, json = false, inspect = false, names = false, project = false, init = false }
 
 ---@type table<string, gaanim.Caps>
 local cache = {}
