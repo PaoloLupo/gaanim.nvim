@@ -23,6 +23,10 @@ local M = {}
 ---@field lsp boolean Point pyright/basedpyright at the project's .venv
 ---@field server gaanim.ServerConfig
 ---@field live gaanim.LiveConfig
+---@field workspace gaanim.WorkspaceConfig
+
+---@class gaanim.WorkspaceConfig
+---@field output string Where `:Gaanim workspace export` writes, from the workspace's root; `{member}` is each member's path
 
 ---@class gaanim.ServerConfig
 ---@field enabled boolean Attach the Gaanim language server to project files
@@ -120,6 +124,7 @@ M.defaults = {
   icons = "nerd",
   server = { enabled = true, hints = true, lens = true, assets = true, typst = true },
   live = { delay = 300, while_typing = false, typing_delay = 900, quiet = true },
+  workspace = { output = "exports/{member}" },
   lsp = true,
 }
 

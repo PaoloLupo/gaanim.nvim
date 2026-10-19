@@ -143,17 +143,19 @@ function M.client(dispatchers, root)
   }
 end
 
---- Asks the client to request hints and lenses again, for a project.
+--- Asks the clients to request hints and lenses again, for a project: its
+--- own, and a workspace's above it, whose shared modules run as a member.
 ---@param root string
 function M.refresh(root)
-  local state = servers[root]
-  if not state or state.closing then
-    return
+  local workspace = require("gaanim.workspace")
+  for server_root, state in pairs(servers) do
+    if not state.closing and (server_root == root or workspace.within(root, server_root)) then
+      vim.schedule(function()
+        pcall(state.dispatchers.server_request, "workspace/inlayHint/refresh", nil)
+        pcall(state.dispatchers.server_request, "workspace/codeLens/refresh", nil)
+      end)
+    end
   end
-  vim.schedule(function()
-    pcall(state.dispatchers.server_request, "workspace/inlayHint/refresh", nil)
-    pcall(state.dispatchers.server_request, "workspace/codeLens/refresh", nil)
-  end)
 end
 
 --- Sends diagnostics for a document.
@@ -250,7 +252,7 @@ function M.attach(buf)
     M.guard_hints()
     vim.lsp.inlay_hint.enable(true, { bufnr = buf })
   end
-  local project = require("gaanim.project").load(root)
+  local project = require("gaanim.project").current(buf)
   if project and require("gaanim.cli").available() and not require("gaanim.inspect").cached(project) then
     M.update(project, 0)
   end

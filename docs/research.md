@@ -32,6 +32,7 @@ nothing in `gaanim init` is specific to an editor.
 | `scene.voiceover(key)` with takes in `narration/<key>.wav` and a JSON sidecar of words | Shows whether each voiceover's take is recorded |
 | The docs' Typst sources inside the wheel (`gaanim/_docs`), with `#api-entry(name: ...)` | `:Gaanim docs` and `:Gaanim api` search the installed version |
 | Complete `.pyi` stubs in the project's `.venv` | The plugin points basedpyright or pyright at that `.venv` when it attaches |
+| Workspaces: a `[workspace]` table lists member projects that share Python folders, assets and one `.venv`; `gaanim project <PATH> --json` describes, without Python, a file's project, workspace, members, `sys.path` and interpreter; `check <WORKSPACE> --members`, `export` with `{member}` | pyright gets the shared interpreter and the `sys.path` folders as `extraPaths`; shared modules run as the active member; shared assets resolve; `:Gaanim workspace` lists, checks, exports and adds members |
 | Typst math via codex symbol names | A completion source with codex 0.3.0's names, each symbol showing its character |
 
 The plugin reads `gaanim --help` once and uses only what the installed version
@@ -107,7 +108,10 @@ completion from the `.venv`, Nerd Font icons and lazy loading. Then a
 Gaanim language server inside Neovim (times as inlay hints, code lenses over
 slides, hover, code actions, symbols, asset and Typst completion, missing
 asset warnings) and live mode with decimal nudges and the animating lines
-highlighted while the preview plays.
+highlighted while the preview plays. Then workspaces, from `gaanim project
+--json`: the shared `.venv` and `sys.path` for completion, shared modules
+that run as the active member, shared assets, and checking, exporting and
+adding members.
 
 Next, in the plugin alone:
 

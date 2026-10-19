@@ -42,6 +42,32 @@ exports, presents, and keeps the narration script beside the code.
 - **Projects.** `:Gaanim new [slides|video] [name]` runs `gaanim init` (Python
   environment included) in `projects_dir` and opens the entry script;
   `:Gaanim projects` lists the projects there.
+- **Workspaces.** Several projects in one repository that share Python code,
+  assets and one `.venv`, listed by a `[workspace]` table in the root
+  `gaanim.toml`. The plugin asks `gaanim project --json` (`gaanim update`
+  brings it), in the background, what each file belongs to:
+  - pyright and basedpyright get the workspace's shared interpreter and the
+    folders on its `sys.path` (`analysis.extraPaths`), so `from common
+    import …` (the shared `src/common/`) and the member's own modules
+    complete;
+  - a shared module (in `[workspace.shared] python`) runs as the *active
+    member*, the one whose files you entered last: `:Gaanim preview`,
+    `check`, `live`, `follow` and the times in the code work from it, and
+    saving it re-times every member. With no member entered yet, a command
+    asks which one and runs with it;
+  - asset names resolve, complete and are checked in the shared assets too;
+  - `:Gaanim workspace` lists the members by group (invalid ones in red, with
+    their error), with *New video*, *New presentation*, *Check all* and
+    *Export all*; `:Gaanim workspace check [members]` checks them in one
+    `gaanim check`, each member's problems as its diagnostics and all of
+    them in one quickfix list; `:Gaanim workspace export [preset] [members]`
+    exports each to `exports/{member}.mp4` under the workspace;
+    `:Gaanim workspace use [member]` picks the member shared modules run as,
+    `new [video|slides] [name]` adds one beside the others, and `info` shows
+    what the file belongs to, its interpreter and `sys.path`;
+  - `:Gaanim new workspace [name]` runs `gaanim init workspace`, and inside a
+    workspace `:Gaanim new video ep2` adds the member `videos/ep2`;
+    `:Gaanim projects` lists a workspace as one entry that opens its members.
 - **Live preview, driven from the code.** `:Gaanim preview` opens the preview,
   which reloads on every save. `:Gaanim preview here` moves it to the instant
   the line under the cursor stands for (the `play` that ends there, the stop,
@@ -97,11 +123,13 @@ exports, presents, and keeps the narration script beside the code.
   operators and spaces. The names are the ones Gaanim's Typst compiles
   (codex 0.3.0; `scripts/gen_typst_symbols.py` regenerates the table).
 - **Python completion.** When basedpyright or pyright attaches to a project
-  file, it is pointed at the project's `.venv`, where `gaanim init` installed
-  the authoring package and its type stubs.
+  file, it is pointed at the project's `.venv` (the workspace's, in a
+  workspace), where `gaanim init` installed the authoring package and its
+  type stubs.
 - **Snippets** for scenes and scripts in `snippets/` (VS Code format).
 - `:checkhealth gaanim` checks `gaanim` and what it supports, FFmpeg, uv, a
-  Python language server, the project's `.venv`, its bundled docs and script.
+  Python language server, the project's environment and `sys.path`, its
+  workspace and members, its bundled docs and script.
 
 ### Newer and older Gaanim
 
@@ -110,7 +138,7 @@ offers. Driving the preview (`here` without a restart, `follow`, `seek`,
 `play`, the playhead) needs `--listen`; exact diagnostic lines and export
 percent need `--message-format json`; `timeline`, the cursor's instant and
 stills at the cursor need `inspect`; stills and ranges by slide name need
-`export` to take names. While a preview is open, Gaanim sends the scene's
+`export` to take names; workspaces need `gaanim project`. While a preview is open, Gaanim sends the scene's
 timeline with each reload (`ready`), so the times in the code update after a
 save without running the scene a second time; `inspect` covers the rest.
 Without these, `preview here` restarts the preview from the cursor's segment
@@ -139,6 +167,7 @@ file:
   keys = {
     { "<leader>mn", "<Plug>(gaanim-new)", desc = "New project" },
     { "<leader>mo", "<Plug>(gaanim-projects)", desc = "Open project" },
+    { "<leader>mw", "<Plug>(gaanim-workspace)", desc = "Workspace members" },
     { "<leader>mp", "<Plug>(gaanim-preview)", desc = "Preview" },
     { "<leader>mh", "<Plug>(gaanim-preview-here)", desc = "Preview at cursor" },
     { "<leader>mf", "<Plug>(gaanim-follow)", desc = "Preview follows cursor" },
@@ -216,6 +245,7 @@ Snippets with blink.cmp: add the plugin's `snippets` folder to
   server = { enabled = true, hints = true, lens = true, assets = true, typst = true },
   live = { delay = 300, while_typing = false, typing_delay = 900, quiet = true },
   lsp = true,                      -- point pyright/basedpyright at .venv
+  workspace = { output = "exports/{member}" }, -- :Gaanim workspace export, from its root
 }
 ```
 

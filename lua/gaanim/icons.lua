@@ -22,6 +22,7 @@ local M = {}
 ---@field next string The panel's next slide
 ---@field slides string A slides project
 ---@field video string A video project
+---@field workspace string A workspace: projects that share code and assets
 ---@field reloading string
 ---@field starting string
 ---@field failed string
@@ -45,6 +46,7 @@ M.sets = {
     next = "󰒭", -- md-skip_next
     slides = "󰐨", -- md-presentation
     video = "󰎁", -- md-movie
+    workspace = "󰉓", -- md-folder_multiple
     reloading = "󰓦", -- md-sync
     starting = "󰔟", -- md-timer_sand
     failed = "✗",
@@ -66,6 +68,7 @@ M.sets = {
     next = "⏭",
     slides = "▤",
     video = "▶",
+    workspace = "▦",
     reloading = "↻",
     starting = "◌",
     failed = "✗",

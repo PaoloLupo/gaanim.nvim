@@ -16,15 +16,12 @@ end
 
 --- A short status for statuslines: the slide under the cursor and the
 --- instant its line stands for, where the preview rests (and `⇄` when it
---- follows the cursor), and the last check; "" outside Gaanim projects.
+--- follows the cursor), and the last check; "" outside Gaanim projects. In
+--- a workspace's shared module, those of the member it runs as.
 ---@return string
 function M.status()
   local buf = vim.api.nvim_get_current_buf()
-  local root = vim.b[buf].gaanim_root
-  if root == nil then
-    root = vim.fs.root(buf, "gaanim.toml") or false
-    vim.b[buf].gaanim_root = root
-  end
+  local root = require("gaanim.project").root_of(buf)
   if not root then
     return ""
   end
