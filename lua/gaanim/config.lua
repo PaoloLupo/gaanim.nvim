@@ -51,7 +51,7 @@ local M = {}
 ---@field editor boolean Make Gaanim's "Open in the editor" open lines in this Neovim
 ---@field listen boolean Drive the preview through `--listen stdio` when Gaanim has it
 ---@field marker boolean Mark the line the preview rests at
----@field animating boolean Highlight the lines whose plays are animating while the preview plays
+---@field animating boolean Highlight active plays and waits during playback
 ---@field follow_delay integer Milliseconds a following preview waits for the cursor to settle
 
 ---@class gaanim.PresentConfig

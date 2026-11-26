@@ -289,7 +289,7 @@ plugin loads. Defaults:
       editor = true,          -- |gaanim-remote|
       listen = true,          -- drive it with --listen stdio (|gaanim-caps|)
       marker = true,          -- sign on the line the preview rests at
-      animating = true,       -- highlight the lines animating while playing
+      animating = true,       -- highlight active plays and waits during playback
       follow_delay = 120,     -- ms the cursor settles before |:Gaanim-follow|
     },
     present = { duration = nil, monitor = nil },
@@ -460,9 +460,10 @@ the buffers it attaches to.
                         diagnostics (`live.quiet`). Turning it on opens the
                         preview at the cursor when it is closed.
 
-While the preview plays, the lines whose `play` is animating are highlighted
-(`GaanimPlaying`, linked to `LspReferenceText`); `preview.animating` turns
-it off.
+During playback, `GaanimPlaying` highlights active `scene.play` and
+`scene.wait` lines. Wait highlighting requires a Gaanim version that
+includes `waits` in its timeline. Set `preview.animating` to false to turn
+off the highlights.
 
                                                      *<Plug>(gaanim-nudge-up)*
                                                    *<Plug>(gaanim-nudge-down)*

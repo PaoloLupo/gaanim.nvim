@@ -135,8 +135,7 @@ local marked = {}
 ---@type table<integer, boolean>
 local animating = {}
 
---- While the preview plays, highlights the lines whose `play` is animating
---- at the playhead (from `gaanim inspect`); clears them when it pauses.
+--- Highlights the plays and waits active at the playhead while it moves.
 ---@param project gaanim.Project
 ---@param playhead gaanim.Playhead
 function M.mark_animating(project, playhead)
@@ -158,18 +157,21 @@ function M.mark_animating(project, playhead)
     return
   end
   local time = playhead.time
-  for _, play in ipairs(data.plays or {}) do
-    if play.file and play.line and play.start <= time + 1e-6 and time < play["end"] then
-      local buf = vim.fn.bufnr(vim.fs.normalize(play.file))
-      if buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) and not vim.bo[buf].modified then
-        local row = math.min(play.line, vim.api.nvim_buf_line_count(buf)) - 1
-        vim.api.nvim_buf_set_extmark(buf, M.animating_ns, row, 0, {
-          line_hl_group = "GaanimPlaying",
-          sign_text = require("gaanim.icons").get()[playhead.loop and "loop" or "playing"],
-          sign_hl_group = "GaanimPlayhead",
-          priority = 15,
-        })
-        animating[buf] = true
+  local sign = require("gaanim.icons").get()[playhead.loop and "loop" or "playing"]
+  for _, spans in ipairs({ data.plays or {}, data.waits or {} }) do
+    for _, span in ipairs(spans) do
+      if span.file and span.line and span.start <= time + 1e-6 and time < span["end"] then
+        local buf = vim.fn.bufnr(vim.fs.normalize(span.file))
+        if buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) and not vim.bo[buf].modified then
+          local row = math.min(span.line, vim.api.nvim_buf_line_count(buf)) - 1
+          vim.api.nvim_buf_set_extmark(buf, M.animating_ns, row, 0, {
+            line_hl_group = "GaanimPlaying",
+            sign_text = sign,
+            sign_hl_group = "GaanimPlayhead",
+            priority = 15,
+          })
+          animating[buf] = true
+        end
       end
     end
   end

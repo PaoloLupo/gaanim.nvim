@@ -1,7 +1,7 @@
 ---@mod gaanim.inspect The timeline with its script lines
 ---
 --- `gaanim inspect --json` runs the scene without a window and lists every
---- segment, stop, marker, voiceover and `play` with its times and the script
+--- segment, stop, marker, voiceover, `play` and `wait` with its times and the script
 --- line that made it. With it the plugin knows the instant each line of code
 --- stands for, even for names built at run time. Needs a Gaanim with
 --- `inspect` (see |gaanim.caps|); without it the plugin reads the Python.
@@ -34,6 +34,7 @@ local M = {}
 ---@field markers { name: string, time: number, file?: string, line?: integer }[]
 ---@field voiceovers { key: string, start: number, ["end"]: number, file?: string, line?: integer }[]
 ---@field plays { start: number, ["end"]: number, file?: string, line?: integer }[]
+---@field waits? { start: number, ["end"]: number, file: string, line: integer }[]
 
 ---@class gaanim.TimelinePoint
 ---@field kind "segment"|"stop"|"marker"|"voiceover"|"play"

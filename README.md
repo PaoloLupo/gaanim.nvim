@@ -35,7 +35,8 @@ exports, presents, and keeps the narration script beside the code.
 - **Live mode.** `:Gaanim live` writes a changed file a moment after you stop
   changing it, without running write hooks such as formatters, so the preview
   shows each change within a fraction of a second. While the preview plays,
-  the lines whose `play` is animating are highlighted.
+  active `scene.play` and `scene.wait` lines are highlighted. Highlighting
+  waits requires a Gaanim version that includes `waits` in its timeline.
 - **Nudging numbers.** `<Plug>(gaanim-nudge-up)` and `-down` work like CTRL-A
   and CTRL-X but step decimals by their own precision (`0.8` → `0.9`,
   `0.25` → `0.26`); with live mode, each nudge shows in the preview.
@@ -232,7 +233,7 @@ Snippets with blink.cmp: add the plugin's `snippets` folder to
     editor = true,                 -- GAANIM_EDITOR back to this Neovim
     listen = true,                 -- drive the preview with --listen stdio
     marker = true,                 -- sign on the line the preview rests at
-    animating = true,              -- highlight the lines animating while playing
+    animating = true,              -- highlight active plays and waits during playback
     follow_delay = 120,            -- ms the cursor settles before following
   },
   present = { duration = nil, monitor = nil },
