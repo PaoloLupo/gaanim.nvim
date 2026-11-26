@@ -422,7 +422,7 @@ A language server written in Lua runs inside Neovim (`vim.lsp.start` with a
 function as `cmd`) and attaches, as `gaanim`, to the Python files of Gaanim
 projects, next to basedpyright or pyright. It offers:
 
-  inlay hints     the time of each `play`, `stop`, segment, marker and
+  inlay hints     the time of each `play`, `wait`, `stop`, segment, marker and
                   voiceover at the end of its line, from the preview's
                   `ready` or `gaanim inspect` (|gaanim-caps|), refreshed
                   after each save; hidden while

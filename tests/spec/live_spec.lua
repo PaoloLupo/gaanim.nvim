@@ -234,6 +234,8 @@ describe("preview control", function()
   it("highlights the active wait only while it plays", function()
     local project = project_mod.load(root)
     local data = timeline()
+    local waits = data.waits
+    data.waits = nil
     inspect.store(project, data)
     vim.cmd.edit(vim.fn.fnameescape(main))
     local buf = vim.api.nvim_get_current_buf()
@@ -247,15 +249,13 @@ describe("preview control", function()
     end
 
     eq({ 13 }, active_rows(0.5, true), "plays still work on older timelines")
-    data.waits = {
-      { file = native(main), line = 23, start = 0.8, ["end"] = 1.3 },
-      { file = native(main), line = 25, start = 1.3, ["end"] = 1.8 },
-    }
+    data.waits = waits
     eq({ 23 }, active_rows(0.8, true), "the play hands off to the wait")
     eq({ 25 }, active_rows(1.3, true), "an adjacent wait replaces the previous highlight")
     eq({}, active_rows(1.5, false), "pausing clears the highlight")
     eq({ 25 }, active_rows(1.5, true), "resuming puts it back")
-    eq({}, active_rows(1.8, true), "the highlight clears when the wait ends")
+    eq({ 29 }, active_rows(1.8, true))
+    eq({}, active_rows(2.8, true), "the highlight clears when the wait ends")
     inspect.cache[project.root] = nil
     vim.cmd("bwipeout!")
   end)

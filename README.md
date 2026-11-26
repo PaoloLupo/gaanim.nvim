@@ -19,8 +19,8 @@ exports, presents, and keeps the narration script beside the code.
 
 - **A Gaanim language server inside Neovim.** It attaches to the Python files
   of every project next to basedpyright and shows what only Gaanim knows:
-  - the time of each `play`, `stop`, segment, marker and voiceover as an
-    inlay hint at the end of its line (`󰐊 0:00.8–0:01.3`, `󰏤 0:01.3`);
+  - inlay hints at the end of `play`, `wait`, `stop`, segment, marker and
+    voiceover lines, such as `󰐊 0:00.0–0:00.8` and `󰔛 0:00.8–0:01.3`;
   - code lenses over each slide (`󰐊 Preview  󰑖 Loop  󰋩 Still  󰍬 ≈0:42 / 1:00
     󰔛 0:12.0–0:30.0`) and voiceover (`take recorded`);
   - hover on a line: what it makes on the timeline; on an asset name: the

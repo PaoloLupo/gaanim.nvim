@@ -61,24 +61,28 @@ function M.labels(data, file)
       add(voiceover.line, icons.voiceover .. " " .. span(voiceover.start, voiceover["end"]))
     end
   end
-  -- Plays: one label per line, with how many when a loop plays several.
-  local plays = {}
-  for _, play in ipairs(data.plays or {}) do
-    if here(play) then
-      local entry = plays[play.line]
-      if entry then
-        entry.count = entry.count + 1
-        entry.from = math.min(entry.from, play.start)
-        entry.to = math.max(entry.to, play["end"])
-      else
-        plays[play.line] = { count = 1, from = play.start, to = play["end"] }
+  -- Group repeated calls on the same line and show their count and time range.
+  local function add_spans(spans, icon)
+    local by_line = {}
+    for _, item in ipairs(spans) do
+      if here(item) then
+        local entry = by_line[item.line]
+        if entry then
+          entry.count = entry.count + 1
+          entry.from = math.min(entry.from, item.start)
+          entry.to = math.max(entry.to, item["end"])
+        else
+          by_line[item.line] = { count = 1, from = item.start, to = item["end"] }
+        end
       end
     end
+    for line, entry in pairs(by_line) do
+      local times = entry.count > 1 and ("×%d "):format(entry.count) or ""
+      add(line, icon .. " " .. times .. span(entry.from, entry.to))
+    end
   end
-  for line, entry in pairs(plays) do
-    local times = entry.count > 1 and ("×%d "):format(entry.count) or ""
-    add(line, icons.playing .. " " .. times .. span(entry.from, entry.to))
-  end
+  add_spans(data.plays or {}, icons.playing)
+  add_spans(data.waits or {}, icons.time)
   return lines
 end
 
